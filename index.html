@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIC 1871 — Family BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ===== TOOLTIP POSITIONING =====
+(function(){
+  var active = null;
+
+  function show(tip) {
+    var box = tip.querySelector('.tip-box');
+    if (!box) return;
+    var icon = tip.querySelector('.tip-icon');
+    // Make box visible but off-screen to measure its height
+    box.style.visibility = 'hidden';
+    box.style.display = 'block';
+    var bh = box.offsetHeight;
+    var bw = box.offsetWidth;
+    box.style.visibility = '';
+    // Get icon position
+    var r = (icon || tip).getBoundingClientRect();
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    // Try above first
+    var top = r.top - bh - 6;
+    if (top < 8) top = r.bottom + 6; // flip below
+    // Horizontal: center on icon, clamp to viewport
+    var left = r.left + r.width / 2 - bw / 2;
+    if (left < 8) left = 8;
+    if (left + bw > vw - 8) left = vw - bw - 8;
+    box.style.top = top + 'px';
+    box.style.left = left + 'px';
+    active = box;
+  }
+
+  function hide() {
+    if (active) { active.style.display = 'none'; active = null; }
+  }
+
+  document.addEventListener('mouseover', function(e) {
+    var tip = e.target.closest && e.target.closest('.tip');
+    if (tip) { hide(); show(tip); }
+  });
+  document.addEventListener('mouseout', function(e) {
+    var tip = e.target.closest && e.target.closest('.tip');
+    var to  = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.tip');
+    if (tip && tip !== to) hide();
+  });
+  document.addEventListener('scroll', hide, true);
+})();
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f4f2ee;--bg2:#ffffff;--bg3:#f0eee9;--bg4:#e8e5df;
+  --coral:#E04A2F;--stone:#6b6860;--stone-dim:#9a9890;
+  --white:#1a1a1a;--white2:#2d2d2d;--white3:#555550;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.15);
+  --green:#2e8f5a;--amber:#c47d0a;--blue:#2d7ab5;--red:#c0392b;
+}
+html,body{height:100%;background:var(--bg);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--white2);font-size:14px;}
+.shell{display:flex;height:100vh;}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.logo-area{padding:22px 18px 18px;border-bottom:1px solid var(--border);}
+.logo-mark{font-size:19px;font-weight:700;color:var(--white);letter-spacing:.06em;}
+.logo-mark span{color:var(--coral);}
+.logo-sub{font-size:10px;color:var(--stone-dim);margin-top:3px;letter-spacing:.07em;text-transform:uppercase;}
+.logo-tagline{font-size:10px;color:var(--stone-dim);margin-top:7px;line-height:1.5;font-style:italic;}
+.nav-section{padding:14px 0;}
+.nav-label{font-size:10px;font-weight:600;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.1em;padding:0 18px;margin-bottom:5px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 18px;font-size:13px;color:var(--white3);cursor:pointer;border-left:2px solid transparent;transition:all .15s;}
+.nav-item:hover{background:var(--bg3);color:var(--white2);}
+.nav-item.active{color:var(--white);border-left-color:var(--coral);background:rgba(240,90,64,0.08);}
+.nav-pip{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.4;}
+.nav-item.active .nav-pip{opacity:1;background:var(--coral);}
+
+/* MAIN */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.topbar{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
+.page-title{font-size:15px;font-weight:600;color:var(--white);}
+.topbar-right{display:flex;gap:8px;align-items:center;}
+.tbadge{font-size:11px;padding:3px 9px;border-radius:3px;border:1px solid var(--border2);color:var(--stone);background:var(--bg3);}
+.tbadge.live{border-color:rgba(240,90,64,0.4);color:var(--coral);background:rgba(240,90,64,0.08);}
+.content{padding:22px 26px;overflow-y:auto;flex:1;}
+.page{display:none;}
+.page.active{display:block;}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;}
+.kpi-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px;}
+.kpi-grid-5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:18px;}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:15px 17px;position:relative;}
+.kpi-label{font-size:11px;color:var(--stone-dim);margin-bottom:7px;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:5px;}
+.kpi-value{font-size:24px;font-weight:700;color:var(--white);line-height:1;}
+.kpi-sub{font-size:11px;color:var(--stone-dim);margin-top:5px;line-height:1.4;}
+.kpi-up{color:var(--green);}
+.kpi-dn{color:var(--red);}
+
+/* TOOLTIP */
+.tip{position:relative;display:inline-flex;align-items:center;cursor:help;}
+.tip-icon{width:13px;height:13px;border-radius:50%;border:1px solid var(--stone-dim);display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--stone-dim);flex-shrink:0;}
+.tip-box{
+  display:none;
+  position:fixed;
+  background:#ffffff;
+  border:1px solid rgba(0,0,0,0.15);
+  border-radius:6px;
+  padding:8px 10px;
+  font-size:11px;
+  color:#444440;
+  line-height:1.5;
+  width:200px;
+  z-index:99999;
+  white-space:normal;
+  pointer-events:none;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* LAYOUT */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.row3{display:grid;grid-template-columns:3fr 2fr;gap:14px;margin-bottom:14px;}
+.row32{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;}
+.row13{display:grid;grid-template-columns:1fr 3fr;gap:14px;margin-bottom:14px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:17px 19px;}
+.card-title{font-size:11px;font-weight:600;color:var(--white2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:7px;}
+.divider{height:1px;background:var(--border);margin:12px 0;}
+
+/* TAGS */
+.tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+.tag-coral{background:rgba(240,90,64,0.15);color:var(--coral);}
+.tag-green{background:rgba(109,191,138,0.12);color:var(--green);}
+.tag-stone{background:rgba(184,181,171,0.1);color:var(--stone);border:1px solid var(--border2);}
+.tag-amber{background:rgba(239,159,39,0.12);color:var(--amber);}
+.tag-blue{background:rgba(91,163,217,0.12);color:var(--blue);}
+.tag-red{background:rgba(224,85,85,0.12);color:var(--red);}
+
+/* BARS */
+.bar-wrap{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px;}
+.bar-fill{height:100%;border-radius:3px;background:var(--coral);}
+
+/* TIMELINE */
+.tl-item{display:flex;gap:11px;margin-bottom:13px;}
+.tl-dot{width:7px;height:7px;border-radius:50%;background:var(--coral);margin-top:5px;flex-shrink:0;}
+.tl-text{font-size:12px;color:var(--white2);line-height:1.45;}
+.tl-date{font-size:10px;color:var(--stone-dim);margin-top:2px;}
+
+/* DEAL ROWS */
+.deal-row{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--border);align-items:center;}
+.deal-row:last-child{border-bottom:none;}
+.deal-ico{width:34px;height:34px;border-radius:5px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--stone);flex-shrink:0;}
+
+/* CHARTS */
+.chart-wrap{position:relative;width:100%;}
+
+/* TABLES */
+table{width:100%;font-size:12px;border-collapse:collapse;}
+th{font-size:10px;font-weight:600;color:var(--stone-dim);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.06em;}
+td{padding:8px 8px;color:var(--white2);border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* FUND TABLE */
+.ftable{width:100%;}
+.frow{display:grid;grid-template-columns:2fr 0.7fr 1fr 1fr 1fr 0.8fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center;}
+.frow:last-child{border-bottom:none;}
+.frow:hover{background:rgba(255,255,255,0.02);}
+.fhdr{font-size:10px;font-weight:600;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;display:grid;grid-template-columns:2fr 0.7fr 1fr 1fr 1fr 0.8fr;gap:8px;padding-bottom:7px;border-bottom:1px solid var(--border2);margin-bottom:2px;}
+
+/* STAT MINI */
+.sm{background:var(--bg3);border-radius:6px;padding:10px 13px;}
+.sm-label{font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.sm-val{font-size:16px;font-weight:700;color:var(--white);}
+
+/* SELECT / INPUT */
+select{font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--bg3);color:var(--white2);cursor:pointer;outline:none;}
+input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--bg3);color:var(--white2);outline:none;}
+
+/* PILLS */
+.pills{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px;}
+.pill{font-size:11px;padding:4px 11px;border-radius:20px;border:1px solid #c8c5be;color:#555550;cursor:pointer;background:#ffffff;}
+.pill:hover{border-color:#999;background:#f0eee9;}
+.pill.active{background:var(--coral);border-color:var(--coral);color:#ffffff;font-weight:600;}
+
+/* ASSET LIST */
+.alist-hdr,.alist-row{display:grid;grid-template-columns:38px 2.2fr 0.9fr 1fr 1fr 1fr 1fr;gap:9px;padding:9px 0 9px 12px;font-size:12px;align-items:center;}
+.alist-hdr{font-size:10px;font-weight:600;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border2);padding-bottom:7px;margin-bottom:3px;}
+.alist-row{border-bottom:1px solid var(--border);cursor:pointer;}
+.alist-row:last-child{border-bottom:none;}
+.alist-row:hover{background:rgba(255,255,255,0.025);}
+.alist-ico{width:30px;height:30px;border-radius:5px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;}
+.scroll-t{max-height:380px;overflow-y:auto;}
+.scroll-t::-webkit-scrollbar{width:4px;}
+.scroll-t::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* INV DETAIL CARD */
+.inv-card{background:var(--bg2);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:14px;}
+.inv-hdr{padding:18px;display:flex;gap:15px;align-items:flex-start;border-bottom:1px solid var(--border);}
+.inv-logo{width:56px;height:56px;border-radius:7px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;}
+.inv-body{padding:18px;}
+.inv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.isl{font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.isv{font-size:14px;font-weight:700;color:var(--white);}
+.board-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;}
+.bpill{display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border:1px solid var(--border2);border-radius:20px;color:var(--white2);background:var(--bg3);}
+.bav{width:15px;height:15px;border-radius:50%;background:rgba(240,90,64,0.2);color:var(--coral);font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.ccy-note{font-size:11px;color:var(--amber);margin-top:4px;}
+
+/* PNL INDICATOR */
+.pnl-pos{color:var(--green);font-weight:700;}
+.pnl-neg{color:var(--red);font-weight:700;}
+.pnl-neu{color:var(--stone-dim);}
+
+/* ALLOCATION STRATEGY CARDS */
+.alloc-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:18px;}
+.alloc-card{border-radius:8px;padding:14px 15px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;transition:border-color .2s;}
+.alloc-card:hover{border-color:var(--border2);}
+.alloc-card.sel{border-color:var(--coral);background:rgba(240,90,64,0.06);}
+.alloc-type{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.alloc-pct{font-size:26px;font-weight:700;color:var(--white);}
+.alloc-target{font-size:11px;color:var(--stone-dim);margin-top:3px;}
+.alloc-irr{font-size:12px;font-weight:600;margin-top:6px;}
+.alloc-bar-outer{height:4px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px;}
+.alloc-bar-inner{height:100%;border-radius:3px;}
+
+/* GAUGE SVG */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;}
+
+/* ESG KPIs */
+.esg-kpi-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+
+/* PHILO */
+.philo-row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+.philo-row:last-child{border-bottom:none;}
+
+/* PROGRESS RING */
+.prog-ring{transform:rotate(-90deg);}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="sidebar">
+    <div class="logo-area">
+      <div class="logo-mark"><span>PIC</span> 1871</div>
+      <div class="logo-sub">Philippson Investment Co.</div>
+      <div class="logo-tagline">"Investing together,<br>creating value for all."</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Analytics</div>
+      <div class="nav-item active" onclick="nav('overview',this)"><div class="nav-pip"></div>Overview</div>
+      <div class="nav-item" onclick="nav('funds',this)"><div class="nav-pip"></div>Funds <span style="font-size:10px;font-style:italic;color:var(--stone-dim);">Associ&eacute;s &amp; Indirect</span></div>
+      <div class="nav-item" onclick="nav('deals',this)"><div class="nav-pip"></div>Guardiola Capital <span style="font-size:10px;font-style:italic;color:var(--stone-dim);">Direct</span></div>
+      <div class="nav-item" onclick="nav('portfolio',this)"><div class="nav-pip"></div>Philing <span style="font-size:10px;font-style:italic;color:var(--stone-dim);">Opportunit&eacute;s</span></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Assets</div>
+      <div class="nav-item" onclick="nav('strategy',this)"><div class="nav-pip"></div>Allocation strategy</div>
+      <div class="nav-item" onclick="nav('assets',this)"><div class="nav-pip"></div>Asset management</div>
+      <div class="nav-item" onclick="nav('valuation',this)"><div class="nav-pip"></div>Valuation</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Impact</div>
+      <div class="nav-item" onclick="nav('esg',this)"><div class="nav-pip"></div>ESG &amp; impact</div>
+      <div class="nav-item" onclick="nav('philanthropy',this)"><div class="nav-pip"></div>Philanthropie</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Structure</div>
+      <div class="nav-item" onclick="nav('governance',this)"><div class="nav-pip"></div>Governance</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="ptitle">Overview &mdash; PIC 1871</div>
+      <div class="topbar-right">
+        <span class="tbadge live">Live</span>
+        <span class="tbadge">31.10.2025</span>
+        <span class="tbadge">Nyon, Switzerland</span>
+        <span class="tbadge">Family Reporting</span>
+      </div>
+    </div>
+    <div class="content">
+
+<!-- ===== OVERVIEW ===== -->
+<div class="page active" id="p-overview">
+
+  <!-- KPI ROW -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Total committed
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          Total capital legally committed across all strategies. <strong style="color:#ffffff;">Not the portfolio valuation</strong> — that will be set at 31/12/2025 by PwC. Source: Annex 31/10/2025
+        </div></div>
+      </div>
+      <div class="kpi-value">141.5 M&euro;</div>
+      <div class="kpi-sub">Total committed (not valuation)</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Capital deployed
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          Capital transferred so far. Remaining 38.2M (27%) is committed but not yet called by fund managers.
+        </div></div>
+      </div>
+      <div class="kpi-value">103.3 M&euro;</div>
+      <div class="kpi-sub kpi-up">73% of 141.5M&euro; &mdash; 38.2M&euro; still to call</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cash returned
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          Cash received back: dividends, exits, sales. Does not include paper gains. = 34.7% of deployed capital.
+        </div></div>
+      </div>
+      <div class="kpi-value">35.8 M&euro;</div>
+      <div class="kpi-sub">34.7% of deployed &mdash; dividends, exits &amp; sales</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Liquid treasury
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          Liquid cash in 3 banks (CA Indosuez, JPM, UBS). Down from 162M (Sep 2024) as capital deploys. Return 2025: 3.62%.
+        </div></div>
+      </div>
+      <div class="kpi-value">144 M&euro;</div>
+      <div class="kpi-sub kpi-dn">&darr; from 162M&euro; (Sep 2024) &mdash; included in donut &mdash; 3.62% net return</div>
+    </div>
+  </div>
+
+  <!-- OBJECTIVES + GAUGE -->
+  <div class="row3" style="margin-bottom:14px;">
+    <div class="card">
+      <div class="card-title">
+        Objectifs &amp; ambitions &mdash; trajectory to 2049
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          J-curve projection at 5%/yr. Floor = 750M (3&times; 2024 patrimony). Ambition = 1,500M (2&times; floor). Source: slide 55.
+        </div></div>
+      </div>
+      <div class="chart-wrap" style="height:215px;"><canvas id="cGrowth" role="img" aria-label="25-year growth trajectory">Growth trajectory 2024-2049</canvas></div>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:#F05A40;display:inline-block;border-radius:2px;"></span>Portfolio @5%/yr from 141.5M&euro;</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:#6dbf8a;display:inline-block;border-radius:2px;"></span>Floor: 750M&euro; (3&times; patrimony)</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:3px;background:#5ba3d9;display:inline-block;border-radius:2px;border-style:dashed;"></span>Ambition: 1,500M&euro;</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">25-year progress gauge
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          141.5M committed vs 750M floor target (18.9%). 1,500M is 2&times; the floor. Not total family patrimony.
+        </div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;padding:6px 0 0;">
+        <svg width="210" height="135" viewBox="0 0 210 135" style="overflow:visible;">
+          <defs>
+            <linearGradient id="gGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#E04A2F;stop-opacity:1"/>
+              <stop offset="100%" style="stop-color:#c47d0a;stop-opacity:1"/>
+            </linearGradient>
+          </defs>
+          <!-- Background arc -->
+          <path d="M 15 115 A 90 90 0 0 1 195 115" fill="none" stroke="#e0ddd8" stroke-width="14" stroke-linecap="round"/>
+          <!-- Progress arc: 141.5/1500 = 18.9% -->
+          <path d="M 15 115 A 90 90 0 0 1 18.9 88.7" fill="none" stroke="url(#gGrad)" stroke-width="14" stroke-linecap="round"/>
+          <!-- Floor marker tick at 750M = top (105, 25) -->
+          <line x1="105" y1="10" x2="105" y2="23" stroke="#2e8f5a" stroke-width="2.5"/>
+          <text x="105" y="8" text-anchor="middle" font-size="9" fill="#2e8f5a" font-weight="700">750M floor</text>
+          <!-- Ambition label -->
+          <text x="198" y="130" text-anchor="middle" font-size="9" fill="#2d7ab5" font-weight="600">1,500M</text>
+          <!-- Zero label -->
+          <text x="12" y="130" text-anchor="middle" font-size="9" fill="#9a9890">0</text>
+          <!-- Center value -->
+          <text x="105" y="86" text-anchor="middle" font-size="24" font-weight="700" fill="#E04A2F">18.9%</text>
+          <text x="105" y="106" text-anchor="middle" font-size="11" fill="#555550">141.5M of 1,500M</text>
+        </svg>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:6px;">
+          <div class="sm"><div class="sm-label">Floor target (25yr)</div><div class="sm-val" style="font-size:14px;">750 M&euro;</div><div style="font-size:10px;color:var(--stone-dim);">3&times; 250M (inflation adj.)</div></div>
+          <div class="sm"><div class="sm-label">Ambition (25yr)</div><div class="sm-val" style="font-size:14px;color:var(--blue);">1,500 M&euro;</div><div style="font-size:10px;color:var(--stone-dim);">2&times; floor target</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONUT + MILESTONES -->
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Portfolio by strategy &mdash; committed + treasury (285.5M&euro; total)
+        <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
+          Click any segment of the donut to drill down into <strong>Sector</strong> or <strong>Geography</strong>. Use the buttons below the chart to switch views. Click the segment again or press "Back" to return to strategy view.<br><br>
+          Sector and geography breakdowns are approximate, based on known investment categories.
+        </div></div>
+      </div>
+
+      <!-- Drill state label -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <div id="drillBreadcrumb" style="font-size:12px;color:var(--stone-dim);">Viewing: <span style="color:var(--white2);font-weight:600;">By strategy</span></div>
+        <button id="drillBackBtn" onclick="drillBack()" style="display:none;font-size:11px;padding:3px 10px;border:1px solid var(--coral);background:transparent;color:var(--coral);border-radius:4px;cursor:pointer;">&larr; Back to strategy</button>
+        <div style="margin-left:auto;display:flex;gap:6px;">
+          <button onclick="drillTo('strategy')" id="btnStrategy" class="drill-btn active-drill" style="font-size:10px;padding:3px 9px;border:1px solid var(--coral);background:rgba(224,74,47,0.1);color:var(--coral);border-radius:4px;cursor:pointer;font-weight:600;">Strategy</button>
+          <button onclick="drillTo('sector')" id="btnSector" class="drill-btn" style="font-size:10px;padding:3px 9px;border:1px solid #c8c5be;background:#ffffff;color:#555550;border-radius:4px;cursor:pointer;">Sector</button>
+          <button onclick="drillTo('geo')" id="btnGeo" class="drill-btn" style="font-size:10px;padding:3px 9px;border:1px solid #c8c5be;background:#ffffff;color:#555550;border-radius:4px;cursor:pointer;">Geography</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;align-items:center;">
+        <div style="flex:1;position:relative;">
+          <div class="chart-wrap" style="height:175px;">
+            <canvas id="cAlloc" role="img" aria-label="Portfolio breakdown donut chart">Portfolio breakdown</canvas>
+          </div>
+          <div style="text-align:center;font-size:10px;color:var(--stone-dim);margin-top:6px;">&#8593; Click a segment to drill down</div>
+        </div>
+        <div id="donutLegend" style="width:155px;display:flex;flex-direction:column;gap:7px;font-size:12px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Key milestones &mdash; most recent first</div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--green);"></div><div><div class="tl-text">Atrium/Finamic platform live &mdash; auto bank feeds &amp; reporting</div><div class="tl-date">2025</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--blue);"></div><div><div class="tl-text">Charte familiale &amp; convention d&rsquo;actionnaires signed</div><div class="tl-date">Early 2025</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--amber);"></div><div><div class="tl-text">UBS Geneva integrated &mdash; 3rd depository bank</div><div class="tl-date">Dec 2024</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--green);"></div><div><div class="tl-text">Guardiola Capital incorporated (split from Guardiola Invest)</div><div class="tl-date">Sept 30, 2024</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--stone);"></div><div><div class="tl-text">Francaja merged into Akassia &rarr; renamed PIC 1871</div><div class="tl-date">July 25, 2024</div></div></div>
+      <div class="tl-item"><div class="tl-dot"></div><div><div class="tl-text">BDP sale closed &mdash; 255M&euro; net proceeds to PIC 1871</div><div class="tl-date">June 3, 2024</div></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== FUND INSIGHTS ===== -->
+<div class="page" id="p-funds">
+
+  <!-- KPI ROW -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Indirect committed <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Total committed to PE funds as LP (Limited Partner). Called progressively by fund managers.</div></div></div>
+      <div class="kpi-value">52.2 M&euro;</div>
+      <div class="kpi-sub">23 funds &mdash; 19.9M&euro; called (38%)</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Still to be called <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Future cash obligations — fund managers can request this capital at any time during the investment period.</div></div></div>
+      <div class="kpi-value">32.3 M&euro;</div>
+      <div class="kpi-sub kpi-dn">62% of indirect not yet deployed</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cash returned (indirect)</div>
+      <div class="kpi-value">7.3 M&euro;</div>
+      <div class="kpi-sub">Mainly Appalaches I+II (6.4M&euro;)</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Associ&eacute;s committed <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Capital invested in GP management companies. Gives governance rights + carried interest share on top of LP returns. Target IRR: 25%.</div></div></div>
+      <div class="kpi-value">7.7 M&euro;</div>
+      <div class="kpi-sub">4 GP stakes &mdash; BDG, La Maison, Seido, Altoria</div>
+    </div>
+  </div>
+
+  <!-- GLOSSARY ROW -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:12px 14px;border-left:3px solid var(--coral);">
+      <div style="font-size:10px;font-weight:600;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">IRR &mdash; Internal Rate of Return</div>
+      <div style="font-size:12px;color:var(--white2);line-height:1.5;">The annualised % return of an investment, accounting for the exact timing of every cash flow in and out. It is the true annual return rate. Example: IRR 15% means the investment grows at 15% per year.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:12px 14px;border-left:3px solid var(--stone);">
+      <div style="font-size:10px;font-weight:600;color:var(--stone);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Hurdle Rate &mdash; Preferred Return</div>
+      <div style="font-size:12px;color:var(--white2);line-height:1.5;">The minimum annual return (typically ~8%) that must be delivered to LP investors <em>before</em> the GP can take any carried interest. It protects investors: if the fund underperforms, the GP earns nothing extra.</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:12px 14px;border-left:3px solid var(--amber);">
+      <div style="font-size:10px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Carried Interest &mdash; The GP&rsquo;s Profit Share</div>
+      <div style="font-size:12px;color:var(--white2);line-height:1.5;">Once the hurdle rate is exceeded, the GP keeps 10&ndash;20% of all profits as carried interest. This aligns incentives: the GP only earns big if investors earn big first. PIC 1871 earns carry as GP co-owner (Associ&eacute;s).</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-right:2px;">Filter:</div>
+    <div class="pills" id="fundTypePills" style="margin-bottom:0;">
+      <div class="pill active" onclick="filterFunds('type','all',this)">All</div>
+      <div class="pill" onclick="filterFunds('type','Indirect',this)">Indirect (LP)</div>
+      <div class="pill" onclick="filterFunds('type','Associes',this)">Associ&eacute;s (GP)</div>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+    <select id="fundSectorFilter" onchange="filterFunds('sector',this.value,null)" style="font-size:11px;padding:4px 8px;">
+      <option value="all">All sectors</option>
+      <option value="Buyout">Buyout</option>
+      <option value="Real Estate">Real Estate</option>
+      <option value="Tech">Tech</option>
+      <option value="Health / Biotech">Health / Biotech</option>
+      <option value="Fund of Funds">Fund of Funds</option>
+      <option value="Climate">Climate</option>
+      <option value="AgriFood">AgriFood</option>
+      <option value="Private Equity">Private Equity</option>
+      <option value="Private Credit">Private Credit</option>
+      <option value="Social Housing">Social Housing</option>
+      <option value="Social Enterprise">Social Enterprise</option>
+      <option value="EdTech">EdTech</option>
+      <option value="Impact PE">Impact PE</option>
+    </select>
+    <select id="fundCountryFilter" onchange="filterFunds('country',this.value,null)" style="font-size:11px;padding:4px 8px;">
+      <option value="all">All countries</option>
+      <option value="Europe">Europe</option>
+      <option value="Canada">Canada</option>
+      <option value="Belgium">Belgium</option>
+      <option value="Israel/Asia">Israel/Asia</option>
+      <option value="USA">USA</option>
+    </select>
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+    <div class="pills" id="fundImpactPills" style="margin-bottom:0;">
+      <div class="pill active" onclick="filterFunds('impact','all',this)">All</div>
+      <div class="pill" style="border-color:rgba(109,191,138,0.4);color:var(--green);" onclick="filterFunds('impact','yes',this)">Impact</div>
+      <div class="pill" onclick="filterFunds('impact','no',this)">Standard</div>
+    </div>
+    <div style="margin-left:auto;font-size:11px;color:var(--stone-dim);" id="fundCount">Showing 26 funds</div>
+  </div>
+
+  <!-- FUND TABLE -->
+  <div class="card" style="padding:0;margin-bottom:14px;">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:2fr 0.7fr 0.8fr 0.8fr 1fr 1fr 1fr 0.7fr 0.7fr;gap:8px;font-size:9px;font-weight:600;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;">
+      <div>Fund</div><div>Type</div><div>Sector</div><div>Country</div>
+      <div>Committed <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Total legally committed.</div></div></div>
+      <div>Called <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Capital actually transferred.</div></div></div>
+      <div>Returned <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Cash received back.</div></div></div>
+      <div>IRR tgt</div><div>Impact</div>
+    </div>
+    <div id="fundTableBody" class="scroll-t" style="max-height:380px;"></div>
+  </div>
+
+  <!-- FUND DETAIL PANEL -->
+  <div id="fundDetail"></div>
+
+  <!-- GP STAKES -->
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Associ&eacute;s &mdash; GP co-ownership stakes <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Owning the GP earns carried interest on top of LP returns. Only 5% of target assets but targets 25% IRR.</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--white2);">La Maison Partners &mdash; 24% stake</span><span style="font-weight:700;color:var(--white);">4.7 M&euro; <span style="font-size:10px;color:var(--stone-dim);">100% called</span></span></div><div class="bar-wrap"><div class="bar-fill" style="width:24%;"></div></div><div style="font-size:10px;color:var(--stone-dim);">Tech/co-invest &middot; Israel &amp; Asia &middot; ~500M&euro; AUM &middot; Min 17.5% carry</div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--white2);">BDG &amp; Associ&eacute;s &mdash; 24.5% stake</span><span style="font-weight:700;color:var(--white);">1.6 M&euro; <span style="font-size:10px;color:var(--stone-dim);">100% called</span></span></div><div class="bar-wrap"><div class="bar-fill" style="width:24.5%;background:var(--stone);"></div></div><div style="font-size:10px;color:var(--stone-dim);">Buyout GP &middot; Canada &middot; Appalaches I/II/III &middot; Min 10% carry</div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--white2);">Seido &mdash; 25% stake</span><span style="font-weight:700;color:var(--amber);">CAD 432K <span style="font-size:10px;color:var(--stone-dim);">&asymp;294K&euro; &middot; 43% called</span></span></div><div class="bar-wrap"><div class="bar-fill" style="width:25%;background:var(--amber);"></div></div><div style="font-size:10px;color:var(--stone-dim);">Health VC GP &middot; Canada &middot; Theodorus &middot; Min 15% carry</div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--white2);">Altoria &mdash; <em style="color:var(--amber);">à formaliser</em></span><span style="font-weight:700;color:var(--white);">1.5 M&euro; <span style="font-size:10px;color:var(--stone-dim);">currently as Indirect</span></span></div><div class="bar-wrap"><div class="bar-fill" style="width:15%;background:var(--blue);"></div></div><div style="font-size:10px;color:var(--stone-dim);">GP stake to be formalised &middot; Europe &middot; Slide 28 Nov 2025</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">How fund economics work</div>
+      <div style="font-size:12px;color:var(--white2);line-height:1.6;margin-bottom:12px;">Funds follow a <strong style="color:var(--white);">J-curve</strong>: capital called and deployed years 1&ndash;5, returns from company sales in years 5&ndash;10. Recent funds show no returns yet &mdash; this is normal.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:12px;"><span style="color:var(--white2);">Management fee (LP cost)</span><span style="font-weight:700;color:var(--stone);">1&ndash;2% of committed/yr</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:12px;"><span style="color:var(--white2);">Hurdle rate (before carry)</span><span style="font-weight:700;color:var(--stone);">~8% preferred return</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:12px;"><span style="color:var(--white2);">Carried interest (GP profit)</span><span style="font-weight:700;color:var(--coral);">10&ndash;20% of profits above hurdle</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:12px;"><span style="color:var(--white2);">Target IRR (Indirect)</span><span style="font-weight:700;color:var(--green);">15% per year</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:12px;"><span style="color:var(--white2);">Target IRR (Associ&eacute;s / GP)</span><span style="font-weight:700;color:var(--green);">25% per year</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== DEAL MANAGEMENT ===== -->
+<div class="page" id="p-deals">
+
+  <!-- INTRO BANNER -->
+  <div style="padding:11px 15px;background:rgba(239,159,39,0.08);border:1px solid rgba(239,159,39,0.25);border-radius:7px;margin-bottom:16px;font-size:12px;color:var(--white2);line-height:1.5;">
+    <strong style="color:var(--amber);">Data source:</strong> All figures on this page come from the Nov 2024 family meeting presentation (slides 157&ndash;163). The investment process, KPIs and portfolio events are sourced verbatim. No estimates.
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Opportunities received <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 162: "44 opportunit&eacute;s d&apos;investissements depuis juin 2024"</div></div></div>
+      <div class="kpi-value">44</div>
+      <div class="kpi-sub">Since June 2024 &mdash; slide 162</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Qualified for IC <div class="tip"><div class="tip-icon">?</div><div class="tip-box">IC = Comit&eacute; d&apos;investissement. From slide 162: "dont 3 ont &eacute;t&eacute; qualifi&eacute;es pour d&eacute;lib&eacute;ration au comit&eacute; d&apos;investissement". Sessions: 02/10/2024 &amp; 07/11/2024.</div></div></div>
+      <div class="kpi-value">3</div>
+      <div class="kpi-sub">IC sessions: 02/10 &amp; 07/11/2024</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Target pace <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 158: "2 nouveaux investissements / an"</div></div></div>
+      <div class="kpi-value">2 / year</div>
+      <div class="kpi-sub">New investments &mdash; slide 158</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Min EBITDA <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 158: "Soci&eacute;t&eacute;s rentables (&gt;&euro;2M EBITDA)". EBITDA = annual operating profit before interest &amp; tax.</div></div></div>
+      <div class="kpi-value">&gt;2 M&euro;</div>
+      <div class="kpi-sub">Profitable SMEs only &mdash; slide 158</div>
+    </div>
+  </div>
+
+  <div class="row2">
+
+    <!-- INVESTMENT PROCESS (exact from slide 162) -->
+    <div class="card">
+      <div class="card-title">Process d&rsquo;investissement &mdash; slide 162</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:2px;">
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(184,181,171,0.08);border:1px solid rgba(184,181,171,0.2);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white2);font-weight:600;width:100%;">Sourcing</div>
+          <span style="min-width:22px;font-size:11px;font-weight:700;color:var(--stone-dim);">44</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(184,181,171,0.10);border:1px solid rgba(184,181,171,0.22);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white2);font-weight:600;width:78%;">Q&amp;A et analyses</div>
+          <span style="min-width:22px;font-size:11px;color:var(--stone-dim);">&#8212;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(184,181,171,0.12);border:1px solid rgba(184,181,171,0.25);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white2);font-weight:600;width:60%;">Note d&rsquo;investissement</div>
+          <span style="min-width:22px;font-size:11px;color:var(--stone-dim);">&#8212;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(240,90,64,0.18);border:1px solid rgba(240,90,64,0.35);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white);font-weight:600;width:42%;">Comit&eacute; d&rsquo;investissement</div>
+          <span style="min-width:22px;font-size:11px;font-weight:700;color:var(--white);">3</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(240,90,64,0.10);border:1px solid rgba(240,90,64,0.2);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white2);font-weight:600;width:32%;">Lettre d&rsquo;intention</div>
+          <span style="min-width:22px;font-size:11px;color:var(--stone-dim);">&#8212;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:rgba(240,90,64,0.08);border:1px solid rgba(240,90,64,0.15);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--stone);font-weight:600;width:24%;">Due diligence</div>
+          <span style="min-width:22px;font-size:11px;color:var(--stone-dim);">&#8212;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+          <div style="height:30px;background:var(--bg3);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--stone-dim);font-size:11px;width:18%;">CA &rarr; Investissement</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 162 &mdash; "Aperçu du pipeline Q3-mi Q4 2024 – liste non-exhaustive"</div>
+    </div>
+
+    <!-- INVESTMENT STRATEGY (exact from slide 158) -->
+    <div class="card">
+      <div class="card-title">Strat&eacute;gie d&rsquo;investissement &mdash; slide 158</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">01</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">2 nouveaux investissements / an</div></div>
+        </div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">02</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Secteurs traditionnels</div></div>
+        </div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">03</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Soci&eacute;t&eacute;s rentables (&gt;&euro;2M EBITDA)</div><div style="font-size:10px;color:var(--stone-dim);margin-top:2px;">EBITDA = b&eacute;n&eacute;fice d&apos;exploitation annuel avant int&eacute;r&ecirc;ts et imp&ocirc;ts</div></div>
+        </div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">04</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Participations minoritaires significatives ou majoritaires</div></div>
+        </div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">05</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Aux c&ocirc;t&eacute;s des dirigeants</div></div>
+        </div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
+          <span style="color:var(--coral);font-weight:700;flex-shrink:0;">06</span>
+          <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Europe occidentale</div></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 158</div>
+    </div>
+  </div>
+
+  <!-- H2 2024 EVENTS (exact from slides 159-160) -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">Faits marquants &mdash; 2&egrave;me semestre 2024 &mdash; slides 159&ndash;160</div>
+    <div style="display:flex;flex-direction:column;gap:0;">
+
+      <!-- Guardiola Capital incorporation -->
+      <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(240,90,64,0.1);border:1px solid rgba(240,90,64,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--coral);flex-shrink:0;text-align:center;line-height:1.2;">GC</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">Guardiola Capital incorporated &mdash; 30/09/2024</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">La cr&eacute;ation juridique et la structuration de Guardiola Capital a vu le jour le 30/9/2024 suite &agrave; la scission avec Guardiola Invest.</div>
+        </div>
+      </div>
+
+      <!-- BON -->
+      <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(109,191,138,0.1);border:1px solid rgba(109,191,138,0.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">BON</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">Bon Group &mdash; entr&eacute;e strat&eacute;gique Colruyt</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">Colruyt Group a investi &euro;3M dans Bon Group et a rachet&eacute; 50% des actions d&eacute;tenues par Guardiola Invest pour &euro;1,5M. Guardiola d&eacute;tient encore <strong style="color:var(--white2);">13,7%</strong> et un si&egrave;ge au CA.</div>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <span style="font-size:11px;background:var(--bg3);padding:3px 8px;border-radius:4px;color:var(--white2);">IRR equity: <strong style="color:var(--coral);">11%</strong></span>
+            <span style="font-size:11px;background:var(--bg3);padding:3px 8px;border-radius:4px;color:var(--white2);">MoIC equity: <strong style="color:var(--coral);">1,7x</strong></span>
+            <span style="font-size:11px;background:var(--bg3);padding:3px 8px;border-radius:4px;color:var(--white2);">DPI: <strong style="color:var(--coral);">0,9x</strong></span>
+            <span style="font-size:11px;background:var(--bg3);padding:3px 8px;border-radius:4px;color:var(--stone-dim);">IRR equity+dette: 9% &mdash; MoIC: 1,4x</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tartes Françoise -->
+      <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(184,181,171,0.1);border:1px solid rgba(184,181,171,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--stone);flex-shrink:0;text-align:center;line-height:1.2;">TF</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">Tartes Fran&ccedil;oise (Belgian Pie Cie) &mdash; CEO &amp; CFO</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">Un nouveau CEO a &eacute;t&eacute; identifi&eacute; par Guardiola Capital. Assistance au recrutement d&rsquo;un CFO ad-interim. Analyse d&rsquo;une opportunit&eacute; de buy-and-build (rachat d&rsquo;un concurrent B2B).</div>
+        </div>
+        <div style="flex-shrink:0;"><span class="tag tag-amber">Active</span></div>
+      </div>
+
+      <!-- MintT (Inytium) -->
+      <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(91,163,217,0.1);border:1px solid rgba(91,163,217,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--blue);flex-shrink:0;text-align:center;line-height:1.2;">INY</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">MintT &mdash; Plan cr&eacute;anciers &amp; augmentation de capital</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">Guardiola Capital impliqu&eacute; dans un plan d&rsquo;augmentation de capital conditionn&eacute;e &agrave; l&rsquo;accord des cr&eacute;anciers. Fixation des param&egrave;tres de valorisation et des conditions de l&rsquo;op&eacute;ration.</div>
+        </div>
+        <div style="flex-shrink:0;"><span class="tag tag-amber">In progress</span></div>
+      </div>
+
+      <!-- Cave 41 -->
+      <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(239,159,39,0.1);border:1px solid rgba(239,159,39,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--amber);flex-shrink:0;text-align:center;line-height:1.2;">C41</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">Cave 41 (Exposant 41) &mdash; Trésorerie &amp; expansion</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">Guardiola Capital a assist&eacute; le d&eacute;partement financier sur le suivi et la visibilit&eacute; de la tr&eacute;sorerie. Plan d&rsquo;expansion vers la Belgique, vente en ligne, et r&eacute;mun&eacute;rations variables &agrave; l&rsquo;&eacute;tude.</div>
+        </div>
+        <div style="flex-shrink:0;"><span class="tag tag-green">Active</span></div>
+      </div>
+
+      <!-- Inytium CFO -->
+      <div style="display:flex;gap:14px;padding:13px 0;align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:6px;background:rgba(109,191,138,0.1);border:1px solid rgba(109,191,138,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--green);flex-shrink:0;text-align:center;line-height:1.2;">INY</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--white2);">Inytium &mdash; Recrutement CFO &amp; contrat majeur</div>
+          <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;line-height:1.5;">Un contrat important sign&eacute; au S2 2024. Guardiola Capital assiste le management pour le recrutement du nouveau CFO.</div>
+        </div>
+        <div style="flex-shrink:0;"><span class="tag tag-green">Active</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slides 159&ndash;160 &mdash; "Faits marquants du deuxi&egrave;me semestre 2024"</div>
+  </div>
+
+  <!-- TEAM -->
+  <div class="card">
+    <div class="card-title">Equipe op&eacute;rationnelle &mdash; slide 158</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="padding:12px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Fr&eacute;d&eacute;ric Markiewicz</div>
+        <div style="font-size:11px;color:var(--coral);margin-top:2px;">Guardiola Capital depuis septembre 2023</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">
+          <span class="tag tag-stone">Private Equity</span><span class="tag tag-stone">M&amp;A</span><span class="tag tag-stone">Conseil</span><span class="tag tag-stone">Relations ext.</span>
+        </div>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Harold Grosfils</div>
+        <div style="font-size:11px;color:var(--coral);margin-top:2px;">Guardiola Capital depuis juin 2024</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">
+          <span class="tag tag-stone">PE / Venture Capital</span><span class="tag tag-stone">M&amp;A</span><span class="tag tag-stone">Gestion d&apos;actifs</span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 158 &mdash; "Mise en place de Guardiola Capital"</div>
+  </div>
+
+</div>
+
+<!-- ===== PORTFOLIO MONITORING ===== -->
+<div class="page" id="p-portfolio">
+
+  <!-- INTRO BANNER -->
+  <div style="padding:11px 15px;background:rgba(184,181,171,0.07);border:1px solid rgba(184,181,171,0.2);border-radius:7px;margin-bottom:16px;font-size:12px;color:var(--white2);line-height:1.5;">
+    <strong style="color:var(--stone);">Philing &mdash; Opportunit&eacute;s:</strong> Legacy holdings, real estate developments and ad-hoc investments. Managed by Marc Van Doornick &amp; Jacques-Martin Philippson. Classification from slide 28 (Nov 2025).
+    <span style="color:var(--stone-dim);">Direct investments (Guardiola Capital) are on the <strong style="color:var(--white2);">Guardiola Capital</strong> page.</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Total committed</div>
+      <div class="kpi-value">48.5 M&euro;</div>
+      <div class="kpi-sub">28 investments &mdash; annex 31/10/2025</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total deployed</div>
+      <div class="kpi-value">42.8 M&euro;</div>
+      <div class="kpi-sub kpi-up">88% called &mdash; 5.7M&euro; remaining</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cash returned</div>
+      <div class="kpi-value">23.5 M&euro;</div>
+      <div class="kpi-sub kpi-up">55% of deployed &mdash; mainly Cetim Projets</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Valuation method</div>
+      <div class="kpi-value">PwC</div>
+      <div class="kpi-sub">Same approach as Direct &mdash; first at 31/12/2025</div>
+    </div>
+  </div>
+
+  <!-- BAR CHART + LEGEND -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">Top investments by committed capital</div>
+    <!-- Legend -->
+    <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--white2);"><span style="width:12px;height:10px;background:rgba(184,181,171,0.55);border:1px solid #B8B5AB;border-radius:2px;display:inline-block;"></span>Committed (M&euro;)</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--white2);"><span style="width:12px;height:10px;background:rgba(109,191,138,0.55);border:1px solid #6dbf8a;border-radius:2px;display:inline-block;"></span>Returned (M&euro;)</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:10px;height:10px;background:rgba(109,191,138,0.2);border:1px solid rgba(109,191,138,0.4);border-radius:10px;display:inline-block;"></span><span style="color:var(--green);">&agrave; conserver</span></span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:10px;height:10px;background:rgba(239,159,39,0.2);border:1px solid rgba(239,159,39,0.4);border-radius:10px;display:inline-block;"></span><span style="color:var(--amber);">&agrave; c&eacute;der / extinction</span></span>
+    </div>
+    <div class="chart-wrap" style="height:220px;"><canvas id="cRealestate" role="img" aria-label="Opportunites bar chart">Committed vs returned by investment</canvas></div>
+  </div>
+
+  <!-- À CONSERVER -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title" style="color:var(--green);">&agrave; conserver <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; investments to keep long-term &mdash; slide 28</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;">
+      <div style="padding:9px 11px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Cetim Projets</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">16.8 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">called &mdash; <span style="color:var(--green);">17.85M returned</span></div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">RE Development &middot; France</div>
+      </div>
+      <div style="padding:9px 11px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">SCI La R&eacute;publique</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">4.4 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">committed &mdash; <span style="color:var(--green);">1.15M returned</span></div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Real Estate &middot; France</div>
+      </div>
+      <div style="padding:9px 11px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">SCI Quai Vernier</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">4.1 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">committed &mdash; <span style="color:var(--green);">950K returned</span></div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Real Estate &middot; France</div>
+      </div>
+      <div style="padding:9px 11px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Winery</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">3.0 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">called &mdash; <span style="color:var(--green);">187K returned</span></div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Wine &middot; Belgium</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <span class="tag tag-green">Adhoc85</span>
+      <span class="tag tag-green">EAPC</span>
+      <span class="tag tag-green">Pilatus 1 &amp; 3</span>
+      <span class="tag tag-green">Oc&eacute;ani Villages</span>
+      <span class="tag tag-green">Sacacomie</span>
+      <span class="tag tag-green">Yeu SCIs</span>
+      <span class="tag tag-green">SCI Marais Guerche</span>
+      <span class="tag tag-green">SCI Baie de la Pipe</span>
+      <span class="tag tag-green">SCI Coeur du Port</span>
+      <span class="tag tag-green">SCI La Tourette</span>
+      <span class="tag tag-green">SCI L&rsquo;Ouche</span>
+      <span class="tag tag-green">SCI Colbert</span>
+      <span class="tag tag-green">SCI Gats Prompts</span>
+      <span class="tag tag-green">SCI La Missionnaire</span>
+      <span class="tag tag-green">Cetim Holding</span>
+      <span class="tag tag-green">Cetim Student RE</span>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:var(--stone-dim);">Source: slide 28, Nov 2025 &mdash; column "Opportunit&eacute;s (Philing)" &mdash; section "&Agrave; conserver"</div>
+  </div>
+
+  <!-- À CÉDER -->
+  <div class="card">
+    <div class="card-title" style="color:var(--amber);">&agrave; c&eacute;der ou conserver jusqu&rsquo;&agrave; extinction <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; slide 28</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px;">
+      <div style="padding:9px 11px;background:rgba(239,159,39,0.06);border:1px solid rgba(239,159,39,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">AED Rent</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">4.4 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">fully called &mdash; 0 returned</div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Real Estate rental &middot; Belgium</div>
+      </div>
+      <div style="padding:9px 11px;background:rgba(239,159,39,0.06);border:1px solid rgba(239,159,39,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Easyvest</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">1.1 M&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">708K called &mdash; 0 returned</div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">FinTech &middot; Belgium</div>
+      </div>
+      <div style="padding:9px 11px;background:rgba(239,159,39,0.06);border:1px solid rgba(239,159,39,0.2);border-radius:6px;">
+        <div style="font-size:10px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">BeCode (SIB)</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">350 K&euro;</div>
+        <div style="font-size:10px;color:var(--stone-dim);">fully called &mdash; <span style="color:var(--green);">133K returned</span></div>
+        <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Impact SIB &middot; Belgium</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+      <span class="tag tag-amber">Helicofin</span>
+      <span class="tag tag-amber">LuckyCycle</span>
+      <span class="tag tag-amber">Domaine des Fouquettes</span>
+    </div>
+    <div style="font-size:10px;color:var(--stone-dim);">Source: slide 28, Nov 2025 &mdash; column "Opportunit&eacute;s (Philing)" &mdash; section "&Agrave; c&eacute;der ou conserver jusqu&rsquo;&agrave; extinction"</div>
+  </div>
+
+</div>
+
+<!-- ===== ALLOCATION STRATEGY ===== -->
+<div class="page" id="p-strategy">
+  <div style="margin-bottom:16px;">
+    <div style="font-size:13px;color:var(--white2);line-height:1.6;padding:14px 17px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);border-left:3px solid var(--coral);">
+      <strong style="color:var(--white);">Strat&eacute;gie d&apos;allocations d&apos;actifs (2025)</strong> &mdash; These are the <em>target</em> percentages of total assets per strategy. Each carries a target annual return (IRR). The current portfolio is still being built toward these targets. No distribution before 2031.
+    </div>
+  </div>
+  <div class="alloc-cards" id="allocCards">
+    <div class="alloc-card sel" onclick="selectAlloc('direct',this)" style="border-color:var(--coral);">
+      <div class="alloc-type" style="color:var(--coral);">Direct</div>
+      <div class="alloc-pct">20%</div>
+      <div class="alloc-target">Target: 50 mio&euro;</div>
+      <div class="alloc-irr" style="color:var(--coral);">12.5% IRR</div>
+      <div style="font-size:10px;color:var(--stone-dim);margin-top:4px;">Current: 33.1M&euro; &nbsp;<span style="color:var(--coral);font-weight:700;">66.2%</span><span style="color:var(--stone-dim);"> of target</span></div>
+      <div class="alloc-bar-outer"><div class="alloc-bar-inner" style="width:66%;background:var(--coral);"></div></div>
+    </div>
+    <div class="alloc-card" onclick="selectAlloc('associes',this)">
+      <div class="alloc-type" style="color:var(--stone);">Associ&eacute;s</div>
+      <div class="alloc-pct">5%</div>
+      <div class="alloc-target">Target: 12.5 mio&euro;</div>
+      <div class="alloc-irr" style="color:var(--stone);">25% IRR</div>
+      <div style="font-size:10px;color:var(--stone-dim);margin-top:4px;">Current: 7.7M&euro; &nbsp;<span style="color:var(--stone);font-weight:700;">61.6%</span><span style="color:var(--stone-dim);"> of target</span></div>
+      <div class="alloc-bar-outer"><div class="alloc-bar-inner" style="width:62%;background:var(--stone);"></div></div>
+    </div>
+    <div class="alloc-card" onclick="selectAlloc('indirect',this)">
+      <div class="alloc-type" style="color:var(--blue);">Indirect</div>
+      <div class="alloc-pct">47.5%</div>
+      <div class="alloc-target">Target: 118.75 mio&euro;</div>
+      <div class="alloc-irr" style="color:var(--blue);">15% IRR</div>
+      <div style="font-size:10px;color:var(--stone-dim);margin-top:4px;">Current: 52.2M&euro; &nbsp;<span style="color:var(--blue);font-weight:700;">44.0%</span><span style="color:var(--stone-dim);"> of target</span></div>
+      <div class="alloc-bar-outer"><div class="alloc-bar-inner" style="width:44%;background:var(--blue);"></div></div>
+    </div>
+    <div class="alloc-card" onclick="selectAlloc('opportunites',this)">
+      <div class="alloc-type" style="color:var(--amber);">Opportunit&eacute;s</div>
+      <div class="alloc-pct">15%</div>
+      <div class="alloc-target">Target: 37.5 mio&euro;</div>
+      <div class="alloc-irr" style="color:var(--amber);">8% IRR</div>
+      <div style="font-size:10px;color:var(--stone-dim);margin-top:4px;">Current: 48.5M&euro; &nbsp;<span style="color:var(--amber);font-weight:700;">129%</span><span style="color:var(--stone-dim);"> of target &#9650;</span></div>
+      <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">Legacy holdings above target</div>
+      <div class="alloc-bar-outer"><div class="alloc-bar-inner" style="width:100%;background:var(--amber);"></div></div>
+    </div>
+    <div class="alloc-card" onclick="selectAlloc('cash',this)">
+      <div class="alloc-type" style="color:var(--green);">Cash</div>
+      <div class="alloc-pct">12.5%</div>
+      <div class="alloc-target">Target: 31.25 mio&euro;</div>
+      <div class="alloc-irr" style="color:var(--green);">3.5% IRR</div>
+      <div style="font-size:10px;color:var(--stone-dim);margin-top:4px;">Current: 144M&euro; &nbsp;<span style="color:var(--green);font-weight:700;">460%</span><span style="color:var(--stone-dim);"> of target*</span></div>
+      <div style="font-size:9px;color:var(--stone-dim);margin-top:2px;">*Deploying progressively</div>
+      <div class="alloc-bar-outer"><div class="alloc-bar-inner" style="width:100%;background:var(--green);"></div></div>
+    </div>
+  </div>
+  <div id="allocDetail"></div>
+</div>
+
+<!-- ===== ASSET MANAGEMENT ===== -->
+<div class="page" id="p-assets">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+    <div class="pills" id="assetPills" style="margin-bottom:0;">
+      <div class="pill active" onclick="filterA('all',this)">All (56)</div>
+      <div class="pill" onclick="filterA('Direct',this)">Direct (8)</div>
+      <div class="pill" onclick="filterA('Indirect',this)">Indirect (23)</div>
+      <div class="pill" onclick="filterA('Opportunites',this)">Opportunit&eacute;s (24)</div>
+      <div class="pill" onclick="filterA('Associes',this)">Associ&eacute;s (4)</div>
+      <div class="pill" onclick="filterA('profit',this)" style="border-color:rgba(109,191,138,0.4);color:var(--green);">Generating returns</div>
+      <div class="pill" onclick="filterA('deploying',this)" style="border-color:rgba(239,159,39,0.4);color:var(--amber);">Still deploying</div>
+    </div>
+    <input type="text" id="assetSearch" placeholder="Search..." oninput="filterA('search',null)" style="margin-left:auto;width:180px;">
+  </div>
+  <div style="font-size:11px;color:var(--amber);margin-bottom:10px;">CAD &amp; USD amounts show foreign currency first, then EUR equivalent in smaller text below.</div>
+  <div class="card" style="padding:0;">
+    <div style="padding:12px 16px 12px 12px;border-bottom:1px solid var(--border);">
+      <div class="alist-hdr">
+        <div></div>
+        <div>Investment</div>
+        <div>Strategy</div>
+        <div>Committed <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Total legally committed.</div></div></div>
+        <div>Called <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Capital transferred so far.</div></div></div>
+        <div>Returned <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Cash received back. Excludes paper gains.</div></div></div>
+        <div>P&amp;L Signal <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Green = returning cash. Orange = deployed, no returns yet. Grey = not started.</div></div></div>
+      </div>
+    </div>
+    <div class="scroll-t" id="assetList" style="max-height:340px;"></div>
+  </div>
+  <div id="assetDetail"></div>
+</div>
+
+<!-- ===== VALUATION ===== -->
+<div class="page" id="p-valuation">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">BDP sale net proceeds <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Net amount received from the sale of the family stake in Banque Degroof Petercam to CA Indosuez (Credit Agricole), after repaying AXA debt and stamp duties.</div></div></div><div class="kpi-value">255 M&euro;</div><div class="kpi-sub">Closed June 3, 2024</div></div>
+    <div class="kpi"><div class="kpi-label">Guarantee escrow <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Part of the sale price is held in a blocked account for 7 years. If CA Indosuez finds issues post-closing, they can claim from this. It earns 4% per year. Estimated net return: 13.8M EUR.</div></div></div><div class="kpi-value">24.5 M&euro;</div><div class="kpi-sub">7-year &middot; 4% return &middot; est. 13.8M&euro; net</div></div>
+    <div class="kpi"><div class="kpi-label">No distribution before <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Unanimous shareholder agreement: no dividends until 2031. All capital stays invested to grow the portfolio. After 2031: distributions linked to achieving the strategic plan.</div></div></div><div class="kpi-value">2031</div><div class="kpi-sub">Unanimous shareholder agreement</div></div>
+    <div class="kpi"><div class="kpi-label">First official valuation</div><div class="kpi-value">31.12.25</div><div class="kpi-sub">PwC audit &middot; Board validation Jun 2026</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">BDP transaction &mdash; key terms</div>
+    <table>
+      <tr><th>Parameter</th><th>Value</th><th>What it means in plain language</th></tr>
+      <tr><td>Total deal (100% of BDP)</td><td style="font-weight:700;color:var(--white);">1,550 M&euro;</td><td style="color:var(--stone-dim);">The total price CA Indosuez paid for the whole bank</td></tr>
+      <tr><td>Valuation / AUM ratio</td><td style="font-weight:700;color:var(--white);">2.5%</td><td style="color:var(--stone-dim);">Bank valued at 2.5% of assets it manages &mdash; standard wealth management multiple</td></tr>
+      <tr><td>P/E multiple <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Price paid = 19.2&times; annual profit. Standard bank valuation multiple.</div></div></td><td style="font-weight:700;color:var(--white);">19.2&times;</td><td style="color:var(--stone-dim);">Buyer paid 19.2x the bank annual profit &mdash; in line with public banks</td></tr>
+      <tr><td>PIC 1871 net proceeds</td><td style="font-weight:700;color:var(--coral);">255 M&euro;</td><td style="color:var(--stone-dim);">Our share after AXA loan repayment and taxes</td></tr>
+      <tr><td>Ticker fee</td><td style="font-weight:700;color:var(--white);">5% then 4%</td><td style="color:var(--stone-dim);">Interest paid by buyer during the 9-month wait between signing and closing</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-title">Treasury &mdash; 3-bank structure (Sep 2025: 144M&euro;)</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="flex:1;min-width:120px;padding:13px;background:var(--bg3);border-radius:7px;border:1px solid var(--border);"><div style="font-size:11px;color:var(--stone-dim);">CA Indosuez</div><div style="font-size:13px;font-weight:700;color:var(--white);margin-top:4px;">Active</div><div style="font-size:10px;color:var(--stone-dim);margin-top:3px;">First deposit Jun 2024 &middot; MSCI World ETF</div></div>
+      <div style="flex:1;min-width:120px;padding:13px;background:var(--bg3);border-radius:7px;border:1px solid var(--border);"><div style="font-size:11px;color:var(--stone-dim);">JP Morgan</div><div style="font-size:13px;font-weight:700;color:var(--white);margin-top:4px;">Active</div><div style="font-size:10px;color:var(--stone-dim);margin-top:3px;">Investment grade bonds &middot; S&amp;P 500 ETF</div></div>
+      <div style="flex:1;min-width:120px;padding:13px;background:var(--bg3);border-radius:7px;border:1px solid rgba(109,191,138,0.35);"><div style="font-size:11px;color:var(--stone-dim);">UBS Geneva</div><div style="font-size:13px;font-weight:700;color:var(--green);margin-top:4px;">Active (Dec 2024)</div><div style="font-size:10px;color:var(--stone-dim);margin-top:3px;">Multi-ETF &middot; CAD bond pocket &middot; Bitcoin</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--stone-dim);line-height:1.6;">Net annualised return 2025: <strong style="color:var(--white);">3.62%</strong> (vs 5.41% in 2024). Lower due to USD/CAD FX impact and equity volatility. Risk profile: very conservative, AAA&ndash;BBB- investment grade only.</div>
+  </div>
+</div>
+
+<!-- ===== ESG ===== -->
+<div class="page" id="p-esg">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Impact allocation</div><div class="kpi-value">~8.8 M&euro;</div><div class="kpi-sub">HappyNest, Impact Fund, Capital 4 Climate, Telos, Phitrust, MPA</div></div>
+    <div class="kpi"><div class="kpi-label">BeCode SIB <div class="tip"><div class="tip-icon">?</div><div class="tip-box">SIB = Social Impact Bond. Govt (Actiris) repays if job insertion target (63%) is met. Currently at 52.9% — partial repayment likely.</div></div></div><div class="kpi-value kpi-dn">At risk</div><div class="kpi-sub kpi-dn">Job insertion 52.9% vs 63% target</div></div>
+    <div class="kpi"><div class="kpi-label">Target IRR (impact) <div class="tip"><div class="tip-icon">?</div><div class="tip-box">~8% annual return target on impact investments. Lower than other strategies — reflects the social premium.</div></div></div><div class="kpi-value">~8%</div><div class="kpi-sub">Financial return target</div></div>
+    <div class="kpi"><div class="kpi-label">Valuation method</div><div class="kpi-value">NAV</div><div class="kpi-sub">Via Atrium &middot; fund manager audited NAVs</div></div>
+  </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Impact positions</div>
+      <div class="deal-row"><div class="deal-ico" style="color:var(--green);background:rgba(109,191,138,0.1);">IE</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Impact Expansion Fund I</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">2.5M&euro; committed &middot; 1.61M&euro; called</div></div><div style="margin-left:auto;"><span class="tag tag-green">Active</span></div></div>
+      <div class="deal-row"><div class="deal-ico" style="color:var(--green);background:rgba(109,191,138,0.1);">HN</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">HappyNest</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">300K&euro; fully deployed &middot; social housing</div></div><div style="margin-left:auto;"><span class="tag tag-green">Deployed</span></div></div>
+      <div class="deal-row"><div class="deal-ico" style="color:var(--amber);background:rgba(239,159,39,0.1);">BC</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">BeCode &mdash; Social Impact Bond</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">350K&euro; &middot; 132K returned &middot; Actiris payback</div></div><div style="margin-left:auto;"><span class="tag tag-amber">Monitoring</span></div></div>
+      <div class="deal-row"><div class="deal-ico" style="color:var(--blue);background:rgba(91,163,217,0.1);">C4</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Capital 4 Climate</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">1M&euro; committed &middot; 300K called</div></div><div style="margin-left:auto;"><span class="tag tag-blue">Deploying</span></div></div>
+      <div class="deal-row"><div class="deal-ico" style="color:var(--blue);background:rgba(91,163,217,0.1);">TC</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Telos Climate Fund</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">2M&euro; committed &middot; 424K called</div></div><div style="margin-left:auto;"><span class="tag tag-blue">Deploying</span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">BeCode SIB &mdash; impact KPIs (2025)</div>
+      <div style="font-size:12px;color:var(--stone-dim);margin-bottom:12px;line-height:1.5;">Belgian government repays investors IF social targets are met. Job insertion target (63%) is now unlikely &mdash; partial repayment expected.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div><div class="esg-kpi-row"><span style="font-size:12px;color:var(--white2);">Participants trained (target: 450)</span><span style="font-size:12px;font-weight:600;color:var(--green);">431 &#10003;</span></div><div class="bar-wrap"><div class="bar-fill" style="width:96%;background:var(--green);"></div></div></div>
+        <div><div class="esg-kpi-row"><span style="font-size:12px;color:var(--white2);">Women share (target: 30%)</span><span style="font-size:12px;font-weight:600;color:var(--green);">35.1% &#10003;</span></div><div class="bar-wrap"><div class="bar-fill" style="width:100%;background:var(--green);"></div></div></div>
+        <div><div class="esg-kpi-row"><span style="font-size:12px;color:var(--white2);">Dropout rate (max 15%)</span><span style="font-size:12px;font-weight:600;color:var(--green);">6.8% &#10003;</span></div><div class="bar-wrap"><div class="bar-fill" style="width:45%;background:var(--green);"></div></div></div>
+        <div><div class="esg-kpi-row"><span style="font-size:12px;color:var(--white2);">Job insertion (target: 63%)</span><span style="font-size:12px;font-weight:600;color:var(--red);">52.9% &#10007;</span></div><div class="bar-wrap"><div class="bar-fill" style="width:84%;background:var(--red);"></div></div><div style="font-size:10px;color:var(--stone-dim);margin-top:3px;">AI replacing entry web dev roles + tough job market</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHILANTHROPIE ===== -->
+<div class="page" id="p-philanthropy">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Annual philanthropy budget</div><div class="kpi-value">~1 M&euro;</div><div class="kpi-sub">Annual &middot; 7-year horizon 2024&ndash;2030</div></div>
+    <div class="kpi"><div class="kpi-label">EPIC 2025 milestone</div><div class="kpi-value kpi-up">$100 M</div><div class="kpi-sub">10yr milestone &middot; 54 associations, 11 countries</div></div>
+    <div class="kpi"><div class="kpi-label">CEJI EU pipeline</div><div class="kpi-value">~700 K&euro;</div><div class="kpi-sub">Grant pipeline 2026&ndash;2028</div></div>
+    <div class="kpi"><div class="kpi-label">FMAP legacy gift</div><div class="kpi-value">210 K&euro;</div><div class="kpi-sub">Legacy &mdash; Madame Burkli (2025)</div></div>
+  </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Active projects</div>
+      <div class="philo-row"><div style="width:8px;height:8px;border-radius:50%;background:var(--coral);flex-shrink:0;"></div><div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--white2);">CEJI &mdash; Jewish contribution to inclusive Europe</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">30yr family relationship &middot; EU projects &middot; anti-discrimination</div></div><div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;padding-left:8px;">350 K&euro;/yr</div></div>
+      <div class="philo-row"><div style="width:8px;height:8px;border-radius:50%;background:var(--stone);flex-shrink:0;"></div><div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--white2);">EPIC Foundation &mdash; "Make smart giving the norm"</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Advisory board &middot; children &amp; planet &middot; $100M milestone 2025</div></div><div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;padding-left:8px;">400 K&euro;/yr</div></div>
+      <div class="philo-row"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--white2);">Alou Keita &mdash; CAMIDE (Mali)</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Rural microfinance &middot; 70,000 members &middot; KFW &amp; OIF co-financing</div></div><div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;padding-left:8px;">~115 K&euro;/yr</div></div>
+      <div class="philo-row"><div style="width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0;"></div><div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--white2);">Ndoto Kids &mdash; Lukah Katangila (Goma)</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Dance schools for street children &middot; permanent premises open</div></div><div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;padding-left:8px;">7 K&euro; (2025)</div></div>
+      <div class="philo-row"><div style="width:8px;height:8px;border-radius:50%;background:var(--stone-dim);flex-shrink:0;"></div><div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--white2);">BeCode, Vocatio, Sam Touzani, other grants</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Social impact bond + cultural &amp; discretionary grants</div></div><div style="font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;padding-left:8px;">~170 K&euro;/yr</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">EPIC &mdash; 2025 snapshot</div>
+      <div style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:12px;">
+        <div class="sm"><div class="sm-label">Total mobilized</div><div class="sm-val" style="color:var(--coral);">$100 M</div></div>
+        <div class="sm"><div class="sm-label">Associations</div><div class="sm-val">20</div></div>
+        <div class="sm"><div class="sm-label">Countries</div><div class="sm-val">11</div></div>
+        <div class="sm"><div class="sm-label">Grantees improved</div><div class="sm-val">96%</div></div>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:12px;color:var(--stone-dim);line-height:1.6;">96% of grantees say EPIC support increased beneficiaries. 58% of donors gave more strategically. School of Philanthropy launched &mdash; 9 golden rules. Field visit to India: March&ndash;April 2026.</div>
+      <div style="margin-top:10px;padding:9px 11px;background:rgba(240,90,64,0.08);border-radius:6px;border-left:2px solid var(--coral);font-size:12px;color:var(--white2);">Next EPIC Night: 13 Nov 2025, Brussels. Target: $100M+ total mobilized by 25 Nov 2025 (10yr anniversary).</div>
+
+
+    </div>
+  </div>
+</div>
+
+<div class="page" id="p-governance">
+
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">Conseil d&rsquo;administration &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">source: pic1871.ch &amp; slide 20, Nov 2025</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--coral);">
+        <div style="font-size:10px;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Chairman of the Board</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Vincent Doumier</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Administrateur ind&eacute;pendant &amp; Pr&eacute;sident du conseil</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--coral);">
+        <div style="font-size:10px;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">CEO &amp; Family Administrator</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Jacques-Martin Philippson</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Administrateur familial &amp; CEO &mdash; Branche JM</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--stone);">
+        <div style="font-size:10px;color:var(--stone);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Executive Director &amp; COO</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Marc Van Doornick</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Administrateur ex&eacute;cutif &amp; COO</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--blue);">
+        <div style="font-size:10px;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Family Administrator</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Fran&ccedil;oise Philippson</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Administrateur familial &mdash; Branche F</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--blue);">
+        <div style="font-size:10px;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Family Administrator</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Catherine Philippson</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Administrateur familial &mdash; Branche C</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--stone-dim);">
+        <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Pr&eacute;sident Honoraire</div>
+        <div style="font-size:14px;font-weight:700;color:var(--white);">Alain Philippson</div>
+        <div style="font-size:11px;color:var(--stone-dim);margin-top:3px;">Pr&eacute;sident honoraire &amp; invit&eacute; permanent</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Independent Director</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Bruno Houdmont</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Independent Director</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Damien Neven</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Independent Director</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Baudouin Paquot</div>
+      </div>
+      <div style="padding:13px;background:var(--bg3);border-radius:7px;">
+        <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Independent Director</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);">Charles Spierer</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--stone-dim);">Rule (slide 20): Min 3 family administrators (1 per branch) + at least as many external administrators. Committees: CNR &amp; CAR.</div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Equipe op&eacute;rationnelle &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">pic1871.ch</span></div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(240,90,64,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--coral);flex-shrink:0;">ER</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Est&eacute;e Roguet</div><div style="font-size:10px;color:var(--stone-dim);">Secr&eacute;taire G&eacute;n&eacute;rale</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(184,181,171,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--stone);flex-shrink:0;">MB</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Mich&egrave;le Benichou</div><div style="font-size:10px;color:var(--stone-dim);">Executive Assistant</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(184,181,171,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--stone);flex-shrink:0;">SD</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Sophie Duhoux</div><div style="font-size:10px;color:var(--stone-dim);">Accountant</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(184,181,171,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--stone);flex-shrink:0;">SV</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">St&eacute;phane Verhaegen</div><div style="font-size:10px;color:var(--stone-dim);">Lawyer</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(240,90,64,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--coral);flex-shrink:0;">FM</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Fr&eacute;d&eacute;ric Markiewicz</div><div style="font-size:10px;color:var(--stone-dim);">CEO Guardiola Capital</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(240,90,64,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--coral);flex-shrink:0;">HG</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Harold Grosfils</div><div style="font-size:10px;color:var(--stone-dim);">Guardiola Capital (since Jun 2024)</div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Comit&eacute;s <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Advisory committees informing the Board. No independent decision-making power.</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:11px 13px;background:rgba(240,90,64,0.06);border:1px solid rgba(240,90,64,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--coral);margin-bottom:4px;">CNR &mdash; Nomination et R&eacute;mun&eacute;ration (6)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Advises on board nominations, family onboarding, remuneration and required competencies.</div></div>
+        <div style="padding:11px 13px;background:rgba(91,163,217,0.06);border:1px solid rgba(91,163,217,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;">CAR &mdash; Audit et Risques (7)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Reviews accounts, risk and internal controls. Advises on the annual Juste Valeur consolidation.</div></div>
+        <div style="padding:11px 13px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;">Comit&eacute; Familial (2)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">1 member per branch + 2 external board members. Organises family meetings and training.</div></div>
+        <div style="padding:11px 13px;background:rgba(184,181,171,0.06);border:1px solid rgba(184,181,171,0.15);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--stone);margin-bottom:4px;">Comit&eacute; Supervision Philanthropie (11)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Oversees Alma philanthropic activity. Meets quarterly.</div></div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--stone-dim);">Numbers in brackets = org chart node numbers, slide 22.</div>
+    </div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Charte familiale &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slide 17, Nov 2025</span></div>
+      <div style="font-size:12px;color:var(--stone-dim);margin-bottom:10px;font-style:italic;">"Points cardinaux d&rsquo;Alain : La Famille &mdash; L&rsquo;Entreprise &mdash; La Philanthropie"</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Coh&eacute;sion familiale</div><div style="font-size:11px;color:var(--stone-dim);">Transmission du patrimoine (PIC et Alma) et des connaissances, solidarit&eacute; familiale</div></div></div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Modernit&eacute;</div><div style="font-size:11px;color:var(--stone-dim);">Acceptation des changements &mdash; refus de l&rsquo;immobilisme</div></div></div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Esprit entrepreneurial</div><div style="font-size:11px;color:var(--stone-dim);">Promotion de l&rsquo;entreprise, capital au travail</div></div></div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Philanthropie</div><div style="font-size:11px;color:var(--stone-dim);">Engagement philanthropique ancr&eacute; dans les valeurs familiales</div></div></div>
+        <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Contraignant</div><div style="font-size:11px;color:var(--stone-dim);">&laquo;&nbsp;Charge morale de la transmission&nbsp;&raquo; &mdash; tous les signataires adh&egrave;rent enti&egrave;rement</div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribution &amp; valorisation &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slide 84</span></div>
+      <div style="padding:12px 14px;background:rgba(240,90,64,0.07);border:1px solid rgba(240,90,64,0.2);border-radius:6px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:var(--coral);margin-bottom:6px;">Politique de distribution</div>
+        <div style="font-size:12px;color:var(--white2);line-height:1.6;"><strong style="color:var(--white);">Aucune distribution avant 2031</strong>, sauf d&eacute;cision unanime des associ&eacute;s.<br>Apr&egrave;s 2031&nbsp;: li&eacute;e &agrave; la <strong style="color:var(--white);">r&eacute;alisation du plan strat&eacute;gique</strong> et &agrave; la Juste Valeur annuelle.</div>
+      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--stone);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">Valorisation par entit&eacute;</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">Direct &mdash; Guardiola Capital</span><span style="color:var(--coral);font-weight:600;">PwC Belgique</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">Opportunit&eacute;s &mdash; Philing</span><span style="color:var(--stone);font-weight:600;">Same approach, by asset type</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">Indirect &mdash; Investco/LPs</span><span style="color:var(--blue);font-weight:600;">Audited fund NAVs</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">Associ&eacute;s &mdash; Newco/GPs</span><span style="color:var(--stone);font-weight:600;">GP valuation + auditors</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">Tr&eacute;sorerie libre</span><span style="color:var(--green);font-weight:600;">Atrium/Finamic (live)</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:5px;font-size:11px;"><span style="color:var(--white2);">PIC 1871 consolidated</span><span style="color:var(--coral);font-weight:600;">External auditor &mdash; 31/12/2025</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Onboarding next gen &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slides 30&ndash;31, Nov 2025</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">
+      <div style="padding:11px 13px;background:var(--bg3);border-radius:6px;border-top:2px solid var(--coral);"><div style="font-size:10px;font-weight:600;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Loyaut&eacute; &amp; formation</div><div style="font-size:12px;font-weight:600;color:var(--white2);margin-bottom:4px;">Obligation de loyaut&eacute;</div><div style="font-size:11px;color:var(--stone-dim);">Confidentialit&eacute;, investissement du temps, formation requise. Pr&eacute;vu Art. 12-D convention.</div></div>
+      <div style="padding:11px 13px;background:var(--bg3);border-radius:6px;border-top:2px solid var(--blue);"><div style="font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Formation (Art. 7 Charte)</div><div style="font-size:12px;font-weight:600;color:var(--white2);margin-bottom:4px;">3 domaines</div><div style="font-size:11px;color:var(--stone-dim);">Gouvernance familiale &middot; Organisation &amp; activit&eacute;s &middot; Diversification des investissements</div></div>
+      <div style="padding:11px 13px;background:var(--bg3);border-radius:6px;border-top:2px solid var(--green);"><div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Chemin progressif</div><div style="font-size:12px;font-weight:600;color:var(--white2);margin-bottom:4px;">4 &eacute;tapes</div><div style="font-size:11px;color:var(--stone-dim);">1. Pr&eacute;sentation m&eacute;tiers &rarr; 2. Marque d&rsquo;int&eacute;r&ecirc;t &rarr; 3. V&eacute;rification ad&eacute;quation &rarr; 4. Examen CNR</div></div>
+    </div>
+  </div>
+
+</div>
+
+    </div>
+  </div>
+
+<script>
+// NAV
+const TITLES={overview:'Overview \u2014 PIC 1871',funds:'Funds — Associés & Indirect',deals:'Guardiola Capital — Direct investments',portfolio:'Portfolio monitoring',strategy:'Allocation strategy',assets:'Asset management',valuation:'Valuation',esg:'ESG & impact',philanthropy:'Philanthropie',governance:'Governance — PIC 1871'};
+function nav(id,el){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById('p-'+id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('ptitle').textContent=TITLES[id];
+  if(id==='assets'){renderAssets('all');document.getElementById('assetDetail').innerHTML='';}
+  if(id==='strategy'){renderAllocDetail('direct');}
+}
+
+// CURRENCY
+var CAD=0.68,USD=0.92;
+function fe(n){if(!n||n===0)return'\u2014';if(n>=1000000)return(n/1000000).toFixed(1)+'M\u20ac';if(n>=1000)return(n/1000).toFixed(0)+'K\u20ac';return n.toLocaleString()+'\u20ac';}
+function fcad(n){if(!n||n===0)return'\u2014';var e=n*CAD;var es=e>=1000000?(e/1000000).toFixed(1)+'M\u20ac':(e/1000).toFixed(0)+'K\u20ac';return (n>=1000000?(n/1000000).toFixed(1)+'M CAD':'CAD '+(n/1000).toFixed(0)+'K')+'<br><span style="font-size:10px;color:#ef9f27;">\u2248'+es+'</span>';}
+function fusd(n){if(!n||n===0)return'\u2014';var e=n*USD;var es=e>=1000000?(e/1000000).toFixed(1)+'M\u20ac':(e/1000).toFixed(0)+'K\u20ac';return '$'+(n/1000).toFixed(0)+'K USD<br><span style="font-size:10px;color:#ef9f27;">\u2248'+es+'</span>';}
+function famt(n,ccy){if(ccy==='CAD')return fcad(n);if(ccy==='USD')return fusd(n);return fe(n);}
+
+// FUND DATA — source: Annex 31/10/2025 + slide 28 Nov 2025
+var FUNDS=[
+  // --- INDIRECT (LP) ---
+  {id:'f1',  n:'Appalaches I',          type:'Indirect', ccy:'EUR', commit:1852830,  called:1852830,  ret:3198309, irr:'~20%', sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'First Appalaches fund. Canadian traditional sector buyout. Fully called. 3.2M returned on 1.85M committed. 25-year track record.', hurdle:'8%', carry:'Min 10%'},
+  {id:'f2',  n:'Appalaches II',         type:'Indirect', ccy:'EUR', commit:3088050,  called:2343175,  ret:3197342, irr:'~20%', sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'Second Appalaches fund. 3.2M returned already. CAD 744K still to be called.', hurdle:'8%', carry:'Min 10%'},
+  {id:'f3',  n:'Appalaches III',        type:'Indirect', ccy:'EUR', commit:18528300, called:2302960,  ret:0,       irr:'15%',  sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'Third fund, ~400M CAD total. Closing Dec 2024. Only 2.3M called — early deployment. Largest single commitment.', hurdle:'8%', carry:'Min 10%'},
+  {id:'f4',  n:'Theodorus 5',           type:'Indirect', ccy:'EUR', commit:3069178,  called:522903,   ret:0,       irr:'15%',  sector:'Health / Biotech', country:'Canada',    impact:false, manager:'Seido Inc',               desc:'Health VC fund. Biotech, MedTech, digital health, North America. PIC 1871 also owns 25% of Seido (the GP).', hurdle:'8%', carry:'Min 15%'},
+  {id:'f5',  n:'La Maison Next Gen',    type:'Indirect', ccy:'EUR', commit:1000000,  called:878000,   ret:12225,   irr:'~12%', sector:'Tech',            country:'Israel/Asia',impact:false, manager:'La Maison Partners',      desc:'Tech and co-investments. Israel and Asia focus. PIC 1871 also owns 24% of La Maison Partners (the GP).', hurdle:'8%', carry:'17.5%'},
+  {id:'f6',  n:'SpringHill FOF III',    type:'Indirect', ccy:'EUR', commit:2182226,  called:2156350,  ret:78592,   irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'SpringHill',              desc:'Fund of funds, nearly fully called. 78K returned.', hurdle:'8%', carry:'10%'},
+  {id:'f7',  n:'SpringHill Access I',   type:'Indirect', ccy:'EUR', commit:862540,   called:207010,   ret:0,       irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'SpringHill',              desc:'Fund of funds. 207K called so far.', hurdle:'8%', carry:'10%'},
+  {id:'f8',  n:'Sweetwood I',           type:'Indirect', ccy:'EUR', commit:862540,   called:760624,   ret:307039,  irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'Sweetwood Capital',       desc:'Fund of funds. 307K returned to date.', hurdle:'8%', carry:'10%'},
+  {id:'f9',  n:'Sweetwood II',          type:'Indirect', ccy:'EUR', commit:862540,   called:546491,   ret:20460,   irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'Sweetwood Capital',       desc:'Fund of funds. 20K returned. Still deploying.', hurdle:'8%', carry:'10%'},
+  {id:'f10', n:'LAF NYC',               type:'Indirect', ccy:'EUR', commit:731995,   called:731995,   ret:390363,  irr:'TBD',  sector:'Real Estate',     country:'USA',        impact:false, manager:'LAF NYC',                 desc:'NYC real estate LP. 390K returned on 732K. Source: Annex + slide 28 (Indirect column).', hurdle:'8%', carry:'TBD'},
+  {id:'f11', n:'Belgian Land',          type:'Indirect', ccy:'EUR', commit:340000,   called:290000,   ret:89359,   irr:'TBD',  sector:'Real Estate',     country:'Belgium',    impact:false, manager:'Belgian Land',            desc:'Belgian real estate fund. 89K returned. 50K still to be called.', hurdle:'8%', carry:'TBD'},
+  {id:'f12', n:'Altoria Fund',          type:'Indirect', ccy:'EUR', commit:1544025,  called:1544025,  ret:0,       irr:'TBD',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Altoria (formalising GP)', desc:'Currently classified as Indirect LP. Slide 28 (Nov 2025) lists it under Associes as "a formaliser" — GP stake in progress.', hurdle:'TBD', carry:'TBD'},
+  {id:'f13', n:'Impact Expansion Fund', type:'Indirect', ccy:'EUR', commit:2500000,  called:1613381,  ret:0,       irr:'~8%',  sector:'Impact PE',       country:'Europe',     impact:true,  manager:'TBD',                     desc:'Impact-focused PE fund. 1.6M called, no distributions yet — early phase.', hurdle:'8%', carry:'TBD'},
+  {id:'f14', n:'HappyNest',             type:'Indirect', ccy:'EUR', commit:300015,   called:300015,   ret:0,       irr:'~8%',  sector:'Social Housing',  country:'Belgium',    impact:true,  manager:'HappyNest',               desc:'Social housing and well-being. Fully deployed. No distributions yet.', hurdle:'8%', carry:'TBD'},
+  {id:'f15', n:'Capital 4 Climate',     type:'Indirect', ccy:'EUR', commit:1000000,  called:300000,   ret:0,       irr:'TBD',  sector:'Climate',         country:'Europe',     impact:true,  manager:'Capital 4 Climate',       desc:'Climate-focused fund. 300K called so far.', hurdle:'8%', carry:'TBD'},
+  {id:'f16', n:'Telos Climate Fund',    type:'Indirect', ccy:'EUR', commit:2000000,  called:423988,   ret:0,       irr:'TBD',  sector:'Climate',         country:'Europe',     impact:true,  manager:'Telos',                   desc:'Climate transition fund. 424K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f17', n:'Astanor Growth I',      type:'Indirect', ccy:'EUR', commit:2500000,  called:0,        ret:0,       irr:'TBD',  sector:'AgriFood',        country:'Europe',     impact:true,  manager:'Astanor Ventures',        desc:'Sustainable agrifood fund. Not yet called — commitment in place.', hurdle:'8%', carry:'TBD'},
+  {id:'f18', n:'MPA Learn Funding',     type:'Indirect', ccy:'EUR', commit:1000000,  called:200000,   ret:0,       irr:'TBD',  sector:'EdTech',          country:'Europe',     impact:true,  manager:'MPA',                     desc:'Education-focused impact fund. 200K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f19', n:'Phitrust',              type:'Indirect', ccy:'EUR', commit:500000,   called:118541,   ret:0,       irr:'TBD',  sector:'Social Enterprise',country:'Europe',    impact:true,  manager:'Phitrust',                desc:'Social enterprise equity fund. 119K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f20', n:'Kartesia Credit Opp. VI',type:'Indirect',ccy:'EUR', commit:2500000,  called:818646,   ret:0,       irr:'TBD',  sector:'Private Credit',  country:'Europe',     impact:false, manager:'Kartesia',                desc:'Private credit / direct lending fund. 819K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f21', n:'LT Capital IV',         type:'Indirect', ccy:'EUR', commit:3000000,  called:649500,   ret:0,       irr:'TBD',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'LT Capital',              desc:'Private equity fund. 649K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f22', n:'Mircap Opp. II',        type:'Indirect', ccy:'EUR', commit:1000000,  called:794971,   ret:0,       irr:'TBD',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Mircap',                  desc:'Private equity opportunities fund. 795K called.', hurdle:'8%', carry:'TBD'},
+  {id:'f23', n:'3MER',                  type:'Indirect', ccy:'EUR', commit:1000000,  called:588386,   ret:0,       irr:'TBD',  sector:'Real Estate',     country:'Europe',     impact:false, manager:'TBD',                     desc:'Real estate fund. 588K called.', hurdle:'TBD', carry:'TBD'},
+  // --- ASSOCIES (GP co-ownership) ---
+  {id:'g1',  n:'BDG & Associes',        type:'Associes', ccy:'EUR', commit:1649203,  called:1649203,  ret:0,       irr:'25%',  sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG',                     desc:'24.5% stake in BDG — the GP managing Appalaches I/II/III. Earns carried interest (min 10%) on all 3 funds. 1 board seat on 5-member board. Christian Turgeon CEO.', hurdle:'8%', carry:'Min 10%'},
+  {id:'g2',  n:'La Maison Partners',    type:'Associes', ccy:'EUR', commit:4701027,  called:4701027,  ret:0,       irr:'25%',  sector:'Tech',            country:'Israel/Asia',impact:false, manager:'La Maison Partners',      desc:'24% stake in La Maison Partners GP. ~500M EUR AUM. Tech/co-investments, Israel and Asia. 2 governance seats. Min 17.5% carried interest. Founded by Michel Cicurel & Marc Levy.', hurdle:'8%', carry:'Min 17.5%'},
+  {id:'g3',  n:'Seido (Theodorus GP)',  type:'Associes', ccy:'EUR', commit:432327,   called:185283,   ret:0,       irr:'25%',  sector:'Health / Biotech', country:'Canada',    impact:false, manager:'Seido Inc',               desc:'25% stake in Seido — GP managing Theodorus health VC funds. Biotech, MedTech, digital health. 1 board seat. CAD 247K still to be called.', hurdle:'8%', carry:'Min 15%'},
+  {id:'g4',  n:'Altoria (a formaliser)',type:'Associes', ccy:'EUR', commit:0,        called:0,        ret:0,       irr:'25%',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Altoria',                 desc:'GP stake to be formalised — listed on slide 28 (Nov 2025) in Associes column. Currently 1.54M invested as LP (Indirect). Transition to GP co-ownership in progress.', hurdle:'TBD', carry:'TBD'},
+];
+
+// Active filters state
+var fundFilters = {type:'all', sector:'all', country:'all', impact:'all'};
+
+function filterFunds(dim, val, el) {
+  fundFilters[dim] = val;
+  // Update pill active state for type and impact groups
+  if (dim === 'type') {
+    document.querySelectorAll('#fundTypePills .pill').forEach(function(p){p.classList.remove('active');});
+    if (el) el.classList.add('active');
+  }
+  if (dim === 'impact') {
+    document.querySelectorAll('#fundImpactPills .pill').forEach(function(p){p.classList.remove('active');});
+    if (el) el.classList.add('active');
+  }
+  renderFundTable();
+}
+
+function applyFundFilters() {
+  return FUNDS.filter(function(f) {
+    if (fundFilters.type !== 'all' && f.type !== fundFilters.type) return false;
+    if (fundFilters.sector !== 'all' && f.sector !== fundFilters.sector) return false;
+    if (fundFilters.country !== 'all' && f.country !== fundFilters.country) return false;
+    if (fundFilters.impact === 'yes' && !f.impact) return false;
+    if (fundFilters.impact === 'no' && f.impact) return false;
+    return true;
+  });
+}
+
+function renderFundTable() {
+  var tb = document.getElementById('fundTableBody');
+  var countEl = document.getElementById('fundCount');
+  if (!tb) return;
+  var list = applyFundFilters();
+  if (countEl) countEl.textContent = 'Showing ' + list.length + ' of ' + FUNDS.length + ' funds';
+
+  tb.innerHTML = list.map(function(f) {
+    var typeCls = f.type === 'Indirect' ? 'tag-blue' : 'tag-stone';
+    var impactBadge = f.impact ? '<span class="tag tag-green" style="font-size:9px;">Impact</span>' : '<span style="color:var(--stone-dim);font-size:11px;">&mdash;</span>';
+    var retStr = f.ret > 0 ? '<span style="color:#6dbf8a;">' + fe(f.ret) + '</span>' : '<span style="color:var(--stone-dim);">&mdash;</span>';
+    var irrStr = f.irr && f.irr !== 'TBD' ? '<span style="color:var(--coral);font-weight:700;">' + f.irr + '</span>' : '<span style="color:var(--stone-dim);">TBD</span>';
+    var altNote = f.id === 'f12' ? ' <span style="color:var(--amber);font-size:9px;">(GP pending)</span>' : '';
+    var altNote2 = f.id === 'g4' ? ' <span style="color:var(--amber);font-size:9px;">(à formaliser)</span>' : '';
+    return '<div style="display:grid;grid-template-columns:2fr 0.7fr 0.8fr 0.8fr 1fr 1fr 1fr 0.7fr 0.7fr;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:11px;align-items:center;cursor:pointer;" onclick="showFundDetail(\'' + f.id + '\')" class="fund-clickrow">'
+      + '<div><span style="font-weight:600;color:#2d2d2d;">' + f.n + altNote + altNote2 + '</span></div>'
+      + '<div><span class="tag ' + typeCls + '">' + (f.type === 'Associes' ? 'GP' : 'LP') + '</span></div>'
+      + '<div style="color:var(--stone-dim);font-size:10px;">' + f.sector + '</div>'
+      + '<div style="color:var(--stone-dim);font-size:10px;">' + f.country + '</div>'
+      + '<div>' + fe(f.commit) + '</div>'
+      + '<div>' + fe(f.called) + (f.commit > 0 ? '<span style="color:var(--stone-dim);font-size:9px;"> (' + Math.round(f.called/f.commit*100) + '%)</span>' : '') + '</div>'
+      + '<div>' + retStr + '</div>'
+      + '<div>' + irrStr + '</div>'
+      + '<div>' + impactBadge + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function showFundDetail(id) {
+  var f = FUNDS.find(function(x){ return x.id === id; });
+  if (!f) return;
+  var wrap = document.getElementById('fundDetail');
+  if (!wrap) return;
+
+  // Toggle: click same fund again to close
+  if (wrap.dataset.open === id) {
+    wrap.innerHTML = '';
+    wrap.dataset.open = '';
+    return;
+  }
+  wrap.dataset.open = id;
+
+  var typeCls = f.type === 'Indirect' ? 'tag-blue' : 'tag-stone';
+  var typeLabel = f.type === 'Associes' ? 'Associ&eacute;s (GP stake)' : 'Indirect (LP)';
+  var callPct = f.commit > 0 ? Math.round(f.called/f.commit*100) : 0;
+  var retPct  = f.called > 0 && f.ret > 0 ? Math.round(f.ret/f.called*100) : 0;
+  var impBadge = f.impact ? '<span class="tag tag-green">Impact fund</span>' : '';
+
+  wrap.innerHTML = '<div style="background:var(--bg2);border:1px solid rgba(240,90,64,0.3);border-radius:9px;overflow:hidden;margin-top:4px;">'
+    + '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">'
+    +   '<div style="display:flex;align-items:center;gap:12px;">'
+    +     '<div style="width:42px;height:42px;border-radius:6px;background:var(--bg3);border:1px solid rgba(240,90,64,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#F05A40;">' + f.n.substring(0,2).toUpperCase() + '</div>'
+    +     '<div><div style="font-size:16px;font-weight:700;color:#ffffff;">' + f.n + '</div>'
+    +     '<div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">' + f.sector + ' &middot; ' + f.country + ' &middot; ' + f.manager + '</div></div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:7px;align-items:center;">'
+    +     '<span class="tag ' + typeCls + '">' + typeLabel + '</span>' + impBadge
+    +     '<button onclick="document.getElementById(\'fundDetail\').innerHTML=\'\';document.getElementById(\'fundDetail\').dataset.open=\'\';" style="font-size:11px;padding:3px 10px;border:1px solid var(--border2);background:transparent;color:var(--stone);border-radius:4px;cursor:pointer;">&#10005; Close</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="padding:16px 18px;">'
+    +   '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">'
+    +     '<div class="sm"><div class="sm-label">Committed</div><div class="sm-val" style="font-size:14px;">' + fe(f.commit) + '</div></div>'
+    +     '<div class="sm"><div class="sm-label">Called (' + callPct + '%)</div><div class="sm-val" style="font-size:14px;">' + fe(f.called) + '</div><div class="bar-wrap" style="margin-top:5px;"><div class="bar-fill" style="width:' + callPct + '%;"></div></div></div>'
+    +     '<div class="sm"><div class="sm-label">Returned' + (retPct > 0 ? ' (' + retPct + '% of called)' : '') + '</div><div class="sm-val" style="font-size:14px;color:' + (f.ret > 0 ? 'var(--green)' : 'var(--stone-dim)') + ';">' + (f.ret > 0 ? fe(f.ret) : '&mdash;') + '</div></div>'
+    +     '<div class="sm"><div class="sm-label">Still to call</div><div class="sm-val" style="font-size:14px;color:' + (f.commit - f.called > 0 ? 'var(--amber)' : 'var(--green)') + ';">' + fe(f.commit - f.called) + '</div></div>'
+    +   '</div>'
+    +   '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px;">'
+    +     '<div style="background:var(--bg3);border-radius:5px;padding:10px 12px;"><div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">About this fund</div><div style="font-size:12px;color:#2d2d2d;line-height:1.55;">' + f.desc + '</div></div>'
+    +     '<div class="sm"><div class="sm-label">Target IRR <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Annualised % return target.</div></div></div><div class="sm-val" style="font-size:16px;color:' + (f.irr !== 'TBD' ? 'var(--coral)' : 'var(--stone-dim)') + ';">' + f.irr + '</div></div>'
+    +     '<div class="sm"><div class="sm-label">Hurdle rate <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">Minimum return before GP earns carry.</div></div></div><div class="sm-val" style="font-size:16px;">' + f.hurdle + '</div></div>'
+    +     '<div class="sm"><div class="sm-label">Carried interest <div class="tip" style="display:inline-flex;"><div class="tip-icon">?</div><div class="tip-box">GP profit share above hurdle rate.</div></div></div><div class="sm-val" style="font-size:16px;color:var(--amber);">' + f.carry + '</div></div>'
+    +   '</div>'
+    + '</div></div>';
+
+  wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// Hover style for fund rows
+document.addEventListener('mouseover', function(e){
+  var row = e.target.closest && e.target.closest('.fund-clickrow');
+  if (row) row.style.background = 'rgba(0,0,0,0.03)';
+});
+document.addEventListener('mouseout', function(e){
+  var row = e.target.closest && e.target.closest('.fund-clickrow');
+  if (row) row.style.background = '';
+});
+
+
+// INVESTMENT DATA
+var INV=[
+  // DIRECT
+  {id:'bon',n:'Bon Group',ab:'BON',type:'Direct',entity:'Guardiola Capital',sec:'Food & Health',geo:'Belgium',ccy:'EUR',commit:2983730,called:2983730,rem:0,ret:1026990,irr:'11%',moic:'1.7x',yr:2020,eq:'13.7%',desc:'Healthy fast food chain. Colruyt Group became strategic partner in 2024, investing 3M EUR and buying 50% of Guardiola stake for 1.5M EUR.',board:['Guardiola Capital (board)','Colruyt Group rep'],col:'#F05A40'},
+  {id:'tarte',n:'Belgian Pie Cie',ab:'BP',type:'Direct',entity:'Guardiola Capital',sec:'Food Pastries',geo:'Belgium',ccy:'EUR',commit:2393032,called:2393032,rem:0,ret:857173,irr:'TBD',moic:'TBD',yr:2018,eq:'Minority',desc:'Premium Belgian tart brand. Growth equity, active board involvement, retail and B2B channel development.',board:['Guardiola Capital (board)','Founder'],col:'#B8B5AB'},
+  {id:'inytium',n:'Inytium',ab:'IN',type:'Direct',entity:'Guardiola Capital',sec:'Technology SaaS',geo:'Belgium',ccy:'EUR',commit:978444,called:978444,rem:0,ret:1885138,irr:'TBD',moic:'~1.9x',yr:2021,eq:'Post-restructuring',desc:'SaaS company. Went through financial restructuring in 2024. Capital increase completed. 1.885M EUR returned on 978K invested.',board:['Guardiola Capital','Creditor reps'],col:'#6dbf8a'},
+  {id:'mintt',n:'DSGI (MintT)',ab:'MT',type:'Direct',entity:'Guardiola Capital',sec:'Technology',geo:'Belgium',ccy:'EUR',commit:1144029,called:1144029,rem:0,ret:0,irr:'TBD',moic:'TBD',yr:2019,eq:'Minority',desc:'Digital services SME. New CFO identified. Buy-and-build opportunity under analysis. Advisory on treasury management.',board:['Guardiola Capital (board)','Founders'],col:'#5ba3d9'},
+  {id:'cave41',n:'Cave 41 (Exposant 41)',ab:'C41',type:'Direct',entity:'Guardiola Capital',sec:'Wine & Spirits',geo:'Belgium',ccy:'EUR',commit:213700,called:213700,rem:0,ret:62043,irr:'TBD',moic:'TBD',yr:2019,eq:'Minority',desc:'Premium wine cellar and retail brand. Organic growth strategy, brand building in Belgian premium wine market.',board:['Guardiola Capital (board)','Founder'],col:'#ef9f27'},
+  {id:'artventure',n:'Artventure',ab:'ART',type:'Direct',entity:'Philing',sec:'Art / Media',geo:'Belgium',ccy:'EUR',commit:379518,called:379518,rem:0,ret:132114,irr:'TBD',moic:'TBD',yr:2016,eq:'Minority',desc:'Art and media investment. Historical Philing holding. 132K EUR returned to date.',board:['Philing rep'],col:'#B8B5AB'},
+  {id:'cornaline',n:'Cornaline House Holding',ab:'COR',type:'Direct',entity:'Philing',sec:'RE Holding',geo:'Belgium',ccy:'EUR',commit:2253,called:2253,rem:0,ret:0,irr:'-',moic:'-',yr:2022,eq:'Minority',desc:'Small real estate holding. Nominal position.',board:['Philing'],col:'#6b6860'},
+  {id:'ecre',n:'ECRE',ab:'ECR',type:'Direct',entity:'Philing',sec:'Real Estate Dev',geo:'France',ccy:'EUR',commit:25000001,called:25000001,rem:0,ret:866334,irr:'TBD',moic:'TBD',yr:2020,eq:'Significant',desc:'PIC 1871 single largest investment at 25M EUR. Large-scale real estate development in France. First official valuation at 31/12/2025.',board:['Philing rep','External board'],col:'#F05A40'},
+  // INDIRECT (key)
+  {id:'appa1',n:'Appalaches I',ab:'AP1',type:'Indirect',entity:'9256 Quebec Inc',sec:'Buyout Canada',geo:'Canada',ccy:'CAD',commit:1852830,called:1852830,rem:0,ret:3198309,irr:'~20%',moic:'~1.7x',yr:2013,eq:'LP',desc:'First Appalaches fund. Canadian traditional sector buyout. Fully called, generating strong distributions. 3.2M EUR returned on 1.85M committed.',board:['LP only - BDG manages'],col:'#6dbf8a'},
+  {id:'appa2',n:'Appalaches II',ab:'AP2',type:'Indirect',entity:'9256 Quebec Inc',sec:'Buyout Canada',geo:'Canada',ccy:'CAD',commit:3088050,called:2343175,rem:744875,ret:3197342,irr:'~20%',moic:'~1.4x',yr:2017,eq:'LP',desc:'Second Appalaches fund. CAD 744K still to be called. 3.2M EUR returned already.',board:['LP only - BDG manages'],col:'#6dbf8a'},
+  {id:'appa3',n:'Appalaches III',ab:'AP3',type:'Indirect',entity:'9256 Quebec Inc',sec:'Buyout Canada',geo:'Canada',ccy:'CAD',commit:18528300,called:2302960,rem:16224881,ret:0,irr:'15% tgt',moic:'Early',yr:2024,eq:'LP',desc:'Third and largest Appalaches fund (~400M CAD total). Only 2.3M EUR called so far - early deployment phase. Target IRR: 15%.',board:['LP only - BDG manages'],col:'#5ba3d9'},
+  {id:'sweetwood1',n:'Sweetwood I',ab:'SW1',type:'Indirect',entity:'PIC 1871',sec:'Fund of Funds',geo:'Europe',ccy:'EUR',commit:862540,called:760624,rem:101916,ret:307039,irr:'TBD',moic:'TBD',yr:2019,eq:'LP',desc:'Fund of funds. 307K EUR returned on 862K committed. Diversification through multi-fund structure.',board:['LP only'],col:'#B8B5AB'},
+  {id:'impactexp',n:'Impact Expansion Fund',ab:'IEF',type:'Indirect',entity:'Philing',sec:'Impact PE',geo:'Europe',ccy:'EUR',commit:2500000,called:1613381,rem:886619,ret:0,irr:'~8%',moic:'Early',yr:2022,eq:'LP',desc:'Impact-focused private equity. 1.61M EUR called, no distributions yet. Aligns with PIC 1871 impact philosophy.',board:['LP only'],col:'#6dbf8a'},
+  {id:'theodorus',n:'Theodorus 5',ab:'TH5',type:'Indirect',entity:'9256 Quebec Inc',sec:'Health VC Canada',geo:'Canada',ccy:'CAD',commit:3069178,called:522903,rem:2546275,ret:0,irr:'15% tgt',moic:'Early',yr:2023,eq:'LP',desc:'Health VC fund in Canada. Biotech, MedTech, digital health. CAD 2.55M still to be called. PIC 1871 also owns 25% of Seido (the GP).',board:['LP only - Seido manages'],col:'#5ba3d9'},
+  {id:'lamaisonnextgen',n:'La Maison Next Gen',ab:'LMN',type:'Indirect',entity:'Philing',sec:'Tech Israel/Asia',geo:'Israel/Asia',ccy:'EUR',commit:1000000,called:878000,rem:122000,ret:12225,irr:'~12%',moic:'Early',yr:2022,eq:'LP',desc:'Tech and co-investment fund by La Maison Partners. Focus on Israel and Asia tech deals. PIC 1871 also owns 24% of La Maison Partners GP.',board:['LP only - La Maison manages'],col:'#B8B5AB'},
+  {id:'happynest',n:'HappyNest',ab:'HN',type:'Indirect',entity:'Philing',sec:'Social Impact',geo:'Belgium',ccy:'EUR',commit:300015,called:300015,rem:0,ret:0,irr:'~8%',moic:'Early',yr:2023,eq:'LP',desc:'Social housing and well-being impact investment. Fully deployed. Aligns with ESG mission.',board:['LP only'],col:'#6dbf8a'},
+  {id:'belgland',n:'Belgian Land',ab:'BL',type:'Indirect',entity:'Philing',sec:'Real Estate Fund',geo:'Belgium',ccy:'EUR',commit:340000,called:290000,rem:50000,ret:89359,irr:'TBD',moic:'TBD',yr:2020,eq:'LP',desc:'Belgian real estate fund. 89K EUR returned. 50K EUR still to be called.',board:['LP only'],col:'#ef9f27'},
+  {id:'astanor',n:'Astanor Growth I',ab:'AST',type:'Indirect',entity:'Philing',sec:'AgriFood Impact',geo:'Europe',ccy:'EUR',commit:2500000,called:0,rem:2500000,ret:0,irr:'TBD',moic:'-',yr:2024,eq:'LP',desc:'AgriFood impact fund. Full 2.5M EUR commitment not yet called. Sustainable agriculture focus.',board:['LP only'],col:'#6dbf8a'},
+  {id:'telos',n:'Telos Climate Fund',ab:'TLF',type:'Indirect',entity:'Philing',sec:'Climate Impact',geo:'Europe',ccy:'EUR',commit:2000000,called:423988,rem:1576012,ret:0,irr:'TBD',moic:'-',yr:2023,eq:'LP',desc:'Climate-focused impact fund. 424K EUR called. Focus on climate transition across Europe.',board:['LP only'],col:'#5ba3d9'},
+  {id:'sh3',n:'SpringHill FOF III',ab:'SH3',type:'Indirect',entity:'Philing',sec:'Fund of Funds',geo:'Europe',ccy:'EUR',commit:2182226,called:2156350,rem:25876,ret:78592,irr:'TBD',moic:'TBD',yr:2018,eq:'LP',desc:'SpringHill fund of funds. Nearly fully called. 78K EUR returned to date.',board:['LP only'],col:'#B8B5AB'},
+  // OPPORTUNITES (key)
+  {id:'cetimproj',n:'Cetim Projets',ab:'CTP',type:'Opportunites',entity:'Philing',sec:'RE Development',geo:'France',ccy:'EUR',commit:16815186,called:16798525,rem:16661,ret:17850404,irr:'TBD',moic:'>1x',yr:2015,eq:'Significant',desc:'Large-scale French real estate development. Fully deployed at 16.8M EUR. 17.85M EUR returned - the portfolio single largest cash generator.',board:['Philing rep','External'],col:'#F05A40'},
+  {id:'aed',n:'AED Rent',ab:'AED',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'Belgium',ccy:'EUR',commit:4389383,called:4389383,rem:0,ret:0,irr:'TBD',moic:'TBD',yr:2018,eq:'Significant',desc:'Belgian real estate rental portfolio. 4.4M EUR fully deployed. Long-term hold generating rental income.',board:['Philing rep'],col:'#ef9f27'},
+  {id:'scirepu',n:'SCI La Republique',ab:'REP',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'France',ccy:'EUR',commit:4387073,called:3190535,rem:1196538,ret:1146538,irr:'TBD',moic:'TBD',yr:2019,eq:'Significant',desc:'French real estate SCI. 3.2M EUR deployed; 1.15M EUR returned. 1.2M EUR still to invest.',board:['Philing rep'],col:'#ef9f27'},
+  {id:'sciquai',n:'SCI Quai Vernier',ab:'QVN',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'France',ccy:'EUR',commit:4075997,called:2861797,rem:1214200,ret:950000,irr:'TBD',moic:'TBD',yr:2019,eq:'Significant',desc:'French real estate SCI. 2.86M EUR deployed; 950K EUR returned.',board:['Philing rep'],col:'#ef9f27'},
+  {id:'easyvest',n:'Easyvest',ab:'EVT',type:'Opportunites',entity:'Philing',sec:'FinTech',geo:'Belgium',ccy:'EUR',commit:1093587,called:708009,rem:385578,ret:0,irr:'TBD',moic:'TBD',yr:2016,eq:'Minority',desc:'Belgian automated portfolio management fintech. Onboarding to Atrium ecosystem in 2025 for synergies.',board:['Philing rep','Founder'],col:'#5ba3d9'},
+  {id:'winery',n:'Winery',ab:'WIN',type:'Opportunites',entity:'Philing',sec:'Wine',geo:'Belgium',ccy:'EUR',commit:3025001,called:3025001,rem:0,ret:187005,irr:'TBD',moic:'TBD',yr:2017,eq:'Significant',desc:'Wine business. 3M EUR fully deployed. 187K EUR returned.',board:['Philing rep'],col:'#B8B5AB'},
+  {id:'becode',n:'BeCode (SIB)',ab:'BC',type:'Opportunites',entity:'Philing',sec:'Social Impact Bond',geo:'Belgium',ccy:'EUR',commit:350000,called:350000,rem:0,ret:132705,irr:'Below tgt',moic:'~0.4x',yr:2020,eq:'SIB Investor',desc:'Social Impact Bond for digital skills training. 350K EUR invested. 132K EUR received. Final repayment depends on job insertion rate - target 63% unlikely.',board:['KOIS (structurer)','Actiris (payeur)'],col:'#ef9f27'},
+  {id:'saccaomie',n:'Sacacomie',ab:'SAC',type:'Opportunites',entity:'Philing',sec:'RE Canada',geo:'Canada',ccy:'EUR',commit:679371,called:679371,rem:0,ret:0,irr:'TBD',moic:'TBD',yr:2022,eq:'Significant',desc:'Hotel Sacacomie at Quebec lakes (1h45 from Montreal). Development of nature residences for rental and sale.',board:['Philing rep'],col:'#5ba3d9'},
+  {id:'scimarais',n:'SCI Marais de la Guerche',ab:'MRG',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'France',ccy:'EUR',commit:2547707,called:1819352,rem:728355,ret:678355,irr:'TBD',moic:'TBD',yr:2019,eq:'Significant',desc:'French real estate SCI. 1.82M EUR deployed; 678K EUR returned.',board:['Philing rep'],col:'#ef9f27'},
+  {id:'scibaie',n:'SCI Baie de la Pipe',ab:'BAP',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'France',ccy:'EUR',commit:1957297,called:1482297,rem:475000,ret:450000,irr:'TBD',moic:'TBD',yr:2019,eq:'Significant',desc:'French real estate SCI. 1.48M EUR deployed; 450K EUR returned.',board:['Philing rep'],col:'#ef9f27'},
+  {id:'scicoeur',n:'SCI Au Coeur du Port',ab:'COP',type:'Opportunites',entity:'Philing',sec:'Real Estate',geo:'France',ccy:'EUR',commit:1446726,called:1026726,rem:420000,ret:400000,irr:'TBD',moic:'TBD',yr:2019,eq:'Significant',desc:'French real estate SCI. 1.03M EUR deployed; 400K EUR returned.',board:['Philing rep'],col:'#ef9f27'},
+  // ASSOCIES
+  {id:'lamaison',n:'La Maison Partners (GP)',ab:'LMP',type:'Associes',entity:'Philing',sec:'Tech GP',geo:'Israel/Asia',ccy:'EUR',commit:4701027,called:4701027,rem:0,ret:0,irr:'~12% hist',moic:'TBD',yr:2022,eq:'24% of GP',desc:'Minority stake in La Maison Partners GP. ~500M EUR AUM. Focus: tech and co-investments, Israel and Asia. PIC 1871 has 2 governance seats and shares carried interest (min 17.5%).',board:['2 governance seats (PIC)','Michel Cicurel','Marc Levy'],col:'#F05A40'},
+  {id:'bdgassoc',n:'BDG & Associes (Appalaches GP)',ab:'BDG',type:'Associes',entity:'9256 Quebec Inc',sec:'Buyout GP',geo:'Canada',ccy:'CAD',commit:1649203,called:1649203,rem:0,ret:0,irr:'TBD',moic:'TBD',yr:2013,eq:'24.5% of GP',desc:'Minority stake in BDG - the GP managing Appalaches funds. PIC 1871 shares carried interest (min 10%). 1 board seat.',board:['1 board seat (PIC)','Christian Turgeon (CEO)'],col:'#5ba3d9'},
+  {id:'lafassoc',n:'LAF NYC (GP stake)',ab:'LAF',type:'Associes',entity:'Philam',sec:'RE GP NYC',geo:'USA',ccy:'USD',commit:871165,called:871165,rem:0,ret:191889,irr:'TBD',moic:'TBD',yr:2018,eq:'GP co-owner',desc:'US real estate GP in New York. 191K EUR returned to date. Co-invested as both GP owner and LP.',board:['Philam rep'],col:'#ef9f27'},
+  {id:'seido',n:'Seido (Theodorus GP)',ab:'SEI',type:'Associes',entity:'9256 Quebec Inc',sec:'Health VC GP',geo:'Canada',ccy:'CAD',commit:432327,called:185283,rem:247044,ret:0,irr:'TBD',moic:'-',yr:2023,eq:'25% of GP',desc:'25% stake in Seido - GP managing Theodorus health VC funds. Focus: biotech, MedTech, digital health. CAD 247K still to be called.',board:['1 board seat (PIC)'],col:'#B8B5AB'},
+];
+
+// PNL SIGNAL
+function pnlSignal(inv){
+  var ratio=inv.called>0?inv.ret/inv.called:0;
+  if(inv.ret>0&&ratio>=0.2)return {lbl:'Generating',col:'#6dbf8a',cls:'tag-green'};
+  if(inv.rem>0&&inv.called===0)return {lbl:'Not started',col:'#6b6860',cls:'tag-stone'};
+  if(inv.called>0&&inv.ret===0)return {lbl:'Deployed',col:'#ef9f27',cls:'tag-amber'};
+  if(inv.ret>0&&ratio<0.2)return {lbl:'Early returns',col:'#5ba3d9',cls:'tag-blue'};
+  return {lbl:'Deployed',col:'#ef9f27',cls:'tag-amber'};
+}
+
+var currentFilter='all';
+function filterA(f,el){
+  if(el){document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('active');});el.classList.add('active');}
+  if(f!=='search')currentFilter=f;
+  var q=document.getElementById('assetSearch').value.toLowerCase();
+  var list=INV.filter(function(i){
+    if(f==='search'||currentFilter==='search')return i.n.toLowerCase().includes(q)||i.sec.toLowerCase().includes(q)||i.type.toLowerCase().includes(q);
+    if(f==='profit')return i.ret>0&&i.ret/i.called>=0.2;
+    if(f==='deploying')return i.rem>0;
+    if(f==='all')return true;
+    return i.type===f;
+  });
+  renderAssets(f,list);
+}
+
+function renderAssets(f,list){
+  if(!list)list=INV;
+  var tb=document.getElementById('assetList');
+  if(!tb)return;
+  tb.innerHTML=list.map(function(inv){
+    var pnl=pnlSignal(inv);
+    var tagcol=inv.type==='Direct'?'tag-coral':inv.type==='Indirect'?'tag-blue':inv.type==='Associes'?'tag-stone':'tag-amber';
+    var cs=famt(inv.commit,inv.ccy);
+    var cl=fe(inv.called);
+    var rt=inv.ret>0?'<span style="color:#6dbf8a;">'+fe(inv.ret)+'</span>':'<span style="color:#6b6860;">\u2014</span>';
+    return '<div class="alist-row" onclick="showInvDetail(\''+inv.id+'\')" title="Click for details">'
+      +'<div><div class="alist-ico" style="border-color:'+inv.col+'44;color:'+inv.col+';">'+inv.ab.substring(0,3)+'</div></div>'
+      +'<div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">'+inv.n+'</div><div style="font-size:10px;color:#6b6860;">'+inv.sec+' &middot; '+inv.geo+'</div></div>'
+      +'<div><span class="tag '+tagcol+'">'+inv.type+'</span></div>'
+      +'<div style="font-size:11px;">'+cs+'</div>'
+      +'<div style="font-size:11px;">'+cl+'</div>'
+      +'<div style="font-size:11px;">'+rt+'</div>'
+      +'<div><span class="tag '+pnl.cls+'">'+pnl.lbl+'</span></div>'
+      +'</div>';
+  }).join('');
+}
+
+function showInvDetail(id){
+  var d=INV.find(function(i){return i.id===id;});
+  if(!d)return;
+  var wrap=document.getElementById('assetDetail');
+  var tagcol=d.type==='Direct'?'tag-coral':d.type==='Indirect'?'tag-blue':d.type==='Associes'?'tag-stone':'tag-amber';
+  var pnl=pnlSignal(d);
+  var ccyNote=d.ccy==='CAD'?'<div class="ccy-note">Currency: CAD &mdash; shown in EUR at ~0.68 rate</div>':d.ccy==='USD'?'<div class="ccy-note">Currency: USD &mdash; shown in EUR at ~0.92 rate</div>':'';
+  var irrcol=d.irr&&d.irr!=='TBD'&&d.irr!=='-'?'var(--coral)':'var(--stone-dim)';
+  var moiccol=d.moic&&d.moic!=='TBD'&&d.moic!=='-'&&!d.moic.includes('Early')?'var(--coral)':'var(--stone-dim)';
+  var boards=d.board.map(function(m){var ini=m.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();return '<div class="bpill"><div class="bav">'+ini+'</div>'+m+'</div>';}).join('');
+  wrap.innerHTML='<div class="inv-card">'
+    +'<div class="inv-hdr">'
+    +'<div class="inv-logo" style="border-color:'+d.col+'44;color:'+d.col+';">'+d.ab.substring(0,2)+'</div>'
+    +'<div style="flex:1;">'
+    +'<div style="font-size:18px;font-weight:700;color:#ffffff;">'+d.n+'</div>'
+    +'<div style="font-size:12px;color:#6b6860;margin-top:3px;">'+d.sec+' &middot; '+d.geo+'</div>'
+    +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">'
+    +'<span class="tag '+tagcol+'">'+d.type+'</span>'
+    +'<span class="tag tag-stone">'+d.entity+'</span>'
+    +(d.yr?'<span class="tag tag-stone">Since '+d.yr+'</span>':'')
+    +'<span class="tag '+pnl.cls+'">'+pnl.lbl+'</span>'
+    +'</div>'+ccyNote+'</div>'
+    +'<div style="text-align:right;flex-shrink:0;">'
+    +'<div style="font-size:10px;color:#6b6860;text-transform:uppercase;letter-spacing:.06em;">Equity stake</div>'
+    +'<div style="font-size:14px;font-weight:700;color:#F05A40;">'+d.eq+'</div>'
+    +'</div></div>'
+    +'<div class="inv-body">'
+    +'<div class="inv-stats">'
+    +'<div><div class="isl">Committed</div><div class="isv">'+famt(d.commit,d.ccy)+'</div></div>'
+    +'<div><div class="isl">Called (deployed)</div><div class="isv">'+fe(d.called)+'</div></div>'
+    +'<div><div class="isl">Cash returned</div><div class="isv" style="color:'+(d.ret>0?'var(--green)':'var(--stone-dim)')+';">'+fe(d.ret)+'</div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;margin-bottom:14px;">'
+    +'<div class="sm" style="flex:1;"><div class="sm-label">IRR <span style="font-weight:400;text-transform:none;font-size:9px;color:#6b6860;">(annual % return)</span></div><div style="font-size:18px;font-weight:700;color:'+irrcol+';">'+d.irr+'</div></div>'
+    +'<div class="sm" style="flex:1;"><div class="sm-label">MoIC <span style="font-weight:400;text-transform:none;font-size:9px;color:#6b6860;">(x times invested)</span></div><div style="font-size:18px;font-weight:700;color:'+moiccol+';">'+d.moic+'</div></div>'
+    +'<div class="sm" style="flex:3;"><div class="sm-label">About this investment</div><div style="font-size:12px;color:#2d2d2d;margin-top:4px;line-height:1.55;">'+d.desc+'</div></div>'
+    +'</div>'
+    +'<div class="divider"></div>'
+    +'<div style="font-size:10px;color:#6b6860;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Board / governance</div>'
+    +'<div class="board-row">'+boards+'</div>'
+    +'</div></div>';
+  wrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ALLOCATION DETAIL CONTENT
+var ALLOC_DETAIL={
+  direct:{title:'Direct investments &mdash; Guardiola Capital',col:'#F05A40',desc:'PIC 1871 takes direct equity stakes in mature, profitable SMEs. Target: 20% of total assets (50M EUR), IRR 12.5%. Guardiola Capital runs the day-to-day management with active board involvement. External audit by PwC Belgium.',items:['Bon Group (Food & Health &middot; Belgium)','Belgian Pie Cie (Pastries &middot; Belgium)','Inytium (SaaS &middot; Belgium)','DSGI MintT (Technology &middot; Belgium)','Cave 41 (Wine &middot; Belgium)','ECRE (Real Estate Dev &middot; France)','Artventure (Art/Media &middot; Belgium)','Cornaline House Holding']},
+  associes:{title:'Associ&eacute;s &mdash; GP co-ownership',col:'#B8B5AB',desc:'PIC 1871 takes minority stakes in General Partners (fund management companies). This gives governance rights AND a share of carried interest - the profit the GP earns. Target: 5% of assets (12.5M EUR), IRR 25%.',items:['La Maison Partners 24% stake &rarr; tech/co-invest GP Israel & Asia','BDG & Associ&eacute;s 24.5% stake &rarr; Appalaches buyout GP Canada','LAF NYC GP co-owner &rarr; real estate GP New York','Seido 25% stake &rarr; health VC GP Canada']},
+  indirect:{title:'Indirect &mdash; LP in funds (Investco)',col:'#5ba3d9',desc:'PIC 1871 invests as a Limited Partner (LP) in private equity funds. Capital is called progressively and returned after companies are sold (5-10 year horizon). Target: 47.5% of assets (118.75M EUR), IRR 15%.',items:['Appalaches I & II & III (Canadian buyout)','Theodorus 5 (Health VC Canada)','La Maison Next Gen (Tech Israel/Asia)','SpringHill FOF III & Access I (Fund of funds)','Sweetwood I & II (Fund of funds)','Impact Expansion Fund & HappyNest (Impact)','Capital 4 Climate & Telos (Climate)','And 8 more funds in deployment...']},
+  opportunites:{title:'Opportunit&eacute;s &mdash; ad hoc &amp; real estate',col:'#ef9f27',desc:'Legacy holdings, real estate developments, and selective one-off deals. Not in the 3 core strategies but still contribute to 25-year value creation. Target: 15% of assets (37.5M EUR), IRR 8%.',items:['Cetim Projets (largest RE dev &middot; France &middot; 16.8M)','ECRE via Direct (25M RE dev &middot; France)','Multiple SCI real estate vehicles (France)','AED Rent (Belgium)','Easyvest (FinTech &middot; Belgium)','Winery, BeCode SIB, Sacacomie...']},
+  cash:{title:'Cash &mdash; treasury management',col:'#6dbf8a',desc:'Conservative treasury across 3 banks (CA Indosuez, JP Morgan, UBS Geneva). Investment grade bonds (AAA-BBB-), ETF equity sleeves (MSCI World, S&P 500), CAD bond pocket for natural hedging. Target: 12.5% (31.25M EUR), 3.5% return. Current: 144M EUR (higher than target during deployment phase).',items:['CA Indosuez &mdash; MSCI World ETF + bonds','JP Morgan &mdash; S&P 500 ETF + investment grade bonds','UBS Geneva &mdash; multi-ETF + CAD bond pocket + Bitcoin','Net 2025 return: 3.62% (vs 5.41% in 2024)']}
+};
+
+function selectAlloc(key,el){
+  document.querySelectorAll('.alloc-card').forEach(function(c){c.classList.remove('sel');c.style.borderColor='';});
+  el.classList.add('sel');
+  var d=ALLOC_DETAIL[key];
+  el.style.borderColor=d.col;
+  renderAllocDetail(key);
+}
+
+function renderAllocDetail(key){
+  var d=ALLOC_DETAIL[key];
+  var wrap=document.getElementById('allocDetail');
+  if(!wrap)return;
+  wrap.innerHTML='<div class="card" style="border-left:3px solid '+d.col+';">'
+    +'<div class="card-title" style="color:'+d.col+';">'+d.title+'</div>'
+    +'<div style="font-size:13px;color:#2d2d2d;line-height:1.7;margin-bottom:14px;">'+d.desc+'</div>'
+    +'<div style="font-size:11px;color:#6b6860;text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px;">Investments in this strategy</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:7px;">'
+    +d.items.map(function(item){return '<div style="padding:7px 11px;background:var(--bg3);border-radius:5px;font-size:12px;color:#2d2d2d;border-left:2px solid '+d.col+';">'+item+'</div>';}).join('')
+    +'</div></div>';
+}
+
+// CHARTS
+window.addEventListener('DOMContentLoaded',function(){
+  renderFundTable();
+  renderAssets('all');
+  renderAllocDetail('direct');
+
+  // ===== GROWTH TRAJECTORY CHART (J-curve shape) =====
+  var yrs=[], cur=[], floor=[], amb=[];
+  var base=141.5, flr=750, ambi=1500;
+  // J-curve: slow start (PE locked up), then accelerates
+  // PE funds have J-curve: years 1-5 = flat/slightly up, years 6-15 = accelerating
+  var jFactors=[1.0,1.01,1.02,1.03,1.05,1.08,1.13,1.20,1.30,1.43,1.58,1.76,1.97,2.20,2.46,2.75,3.07,3.43,3.82,4.26,4.75,5.30,5.90,6.58,7.33,8.17];
+  for(var i=0;i<=25;i++){
+    yrs.push(2024+i);
+    cur.push(+(base*jFactors[i]).toFixed(1));
+    floor.push(flr);
+    amb.push(ambi);
+  }
+  var growthCtx = document.getElementById('cGrowth');
+  if(growthCtx) new Chart(growthCtx,{
+    type:'line',
+    data:{labels:yrs,datasets:[
+      {label:'Portfolio (J-curve projection)',data:cur,borderColor:'#F05A40',backgroundColor:'rgba(224,74,47,0.06)',tension:0.5,pointRadius:0,borderWidth:2.5,fill:true},
+      {label:'Floor 750M',data:floor,borderColor:'#6dbf8a',borderDash:[7,4],pointRadius:0,borderWidth:1.5,fill:false},
+      {label:'Ambition 1,500M',data:amb,borderColor:'#5ba3d9',borderDash:[3,3],pointRadius:0,borderWidth:1.5,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.parsed.y.toFixed(0)+'M EUR';}}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888880',font:{size:10},maxTicksLimit:7}},
+        y:{grid:{color:'rgba(0,0,0,0.07)'},ticks:{color:'#888880',font:{size:10},callback:function(v){return v<1000?v+'M':+(v/1000).toFixed(1)+'B';}},min:0,max:1700}
+      }
+    }
+  });
+
+  // ===== DRILLDOWN DONUT =====
+  var donutChart = null;
+
+  var DRILL_DATA = {
+    strategy:{
+      labels:['Indirect (LP funds)','Opportunites','Direct','Cash (treasury)','Associes (GP stakes)'],
+      values:[52.2,48.5,33.1,144.0,7.7],
+      pcts:[18.3,17.0,11.6,50.4,2.7],
+      colors:['#5ba3d9','#ef9f27','#F05A40','#6dbf8a','#B8B5AB'],
+      note:'Source: PE commitments from Annex 31/10/2025 (141.5M EUR) + Treasury Sep 2025 (144M EUR) = 285.5M EUR total'
+    },
+    sector:{
+      labels:['Cash (treasury)','Real Estate','PE Funds (LP)','Direct Equity','GP Stakes'],
+      values:[144.0,73.5,52.2,8.1,7.7],
+      pcts:[50.4,25.7,18.3,2.8,2.7],
+      colors:['#6dbf8a','#ef9f27','#5ba3d9','#F05A40','#B8B5AB'],
+      note:'Sector breakdown — approximate. Cash = liquid treasury at Sep 2025 (144M EUR).'
+    },
+    geo:{
+      labels:['Cash (multi-currency)','France','Europe (multi)','Canada','Belgium','Israel/Asia','USA'],
+      values:[144.0,59.0,29.8,25.5,13.8,4.6,0.7],
+      pcts:[50.4,20.7,10.4,8.9,4.8,1.6,0.2],
+      colors:['#6dbf8a','#5ba3d9','#B8B5AB','#ef9f27','#F05A40','#888','#6b6860'],
+      note:'Geography breakdown — approximate. Cash held across EUR/CAD/USD in 3 Swiss banks.'
+    }
+  };
+
+  var currentDrill = 'strategy';
+
+  function buildLegend(d){
+    var leg = document.getElementById('donutLegend');
+    if(!leg) return;
+    leg.innerHTML = d.labels.map(function(l,i){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
+        +'<span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:2px;background:'+d.colors[i]+';display:inline-block;flex-shrink:0;"></span><span style="font-size:11px;color:#2d2d2d;">'+l+'</span></span>'
+        +'<span style="text-align:right;flex-shrink:0;"><span style="font-weight:700;color:#ffffff;font-size:12px;">'+d.values[i]+'M</span><br><span style="font-size:10px;color:#6b6860;">'+d.pcts[i]+'%</span></span>'
+        +'</div>';
+    }).join('')
+    + '<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:7px;font-size:10px;color:#6b6860;line-height:1.4;">'+d.note+'</div>';
+  }
+
+  function renderDonut(key){
+    currentDrill = key;
+    var d = DRILL_DATA[key];
+    var bc = document.getElementById('drillBreadcrumb');
+    var bb = document.getElementById('drillBackBtn');
+    var viewNames = {strategy:'By strategy',sector:'By sector',geo:'By geography'};
+    if(bc) bc.innerHTML = 'Viewing: <span style="color:#2d2d2d;font-weight:600;">'+viewNames[key]+'</span>';
+    if(bb) bb.style.display = key==='strategy'?'none':'inline-block';
+
+    // Update drill buttons
+    document.querySelectorAll('.drill-btn').forEach(function(b){
+      b.style.background='#ffffff';b.style.color='#555550';b.style.borderColor='#c8c5be';b.style.fontWeight='400';
+    });
+    var activeBtn = document.getElementById('btn'+key.charAt(0).toUpperCase()+key.slice(1));
+    if(activeBtn){activeBtn.style.background='rgba(224,74,47,0.1)';activeBtn.style.color='#E04A2F';activeBtn.style.borderColor='#E04A2F';activeBtn.style.fontWeight='600';}
+
+    buildLegend(d);
+
+    if(donutChart) donutChart.destroy();
+    var ctx = document.getElementById('cAlloc');
+    if(!ctx) return;
+    donutChart = new Chart(ctx,{
+      type:'doughnut',
+      data:{labels:d.labels,datasets:[{data:d.values,backgroundColor:d.colors,borderWidth:2,borderColor:'#f4f2ee',hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+        onClick:function(e,els){
+          if(els.length>0 && key==='strategy'){
+            var idx=els[0].index;
+            var drillMap=['indirect','sector','direct','associes'];
+            // For strategy view, clicking Indirect -> geo, others -> sector
+            if(idx===0) drillTo('geo');
+            else drillTo('sector');
+          }
+        },
+        plugins:{legend:{display:false},tooltip:{callbacks:{
+          label:function(ctx){return ' '+ctx.label+': '+ctx.parsed.toFixed(1)+'M EUR ('+d.pcts[ctx.dataIndex]+'%)';}
+        }}}
+      }
+    });
+  }
+
+  window.drillTo = function(key){renderDonut(key);};
+  window.drillBack = function(){renderDonut('strategy');};
+
+  renderDonut('strategy');
+
+  // ===== REAL ESTATE CHART =====
+  var reCtx=document.getElementById('cRealestate');
+  if(reCtx) new Chart(reCtx,{
+    type:'bar',
+    data:{
+      labels:['Cetim Projets','AED Rent *','SCI La Rep.','SCI Quai V.','Winery','SCI Marais','SCI Baie'],
+      datasets:[
+        {label:'Committed',data:[16.8,4.4,4.4,4.1,3.0,2.5,2.0],backgroundColor:['rgba(184,181,171,0.5)','rgba(239,159,39,0.5)','rgba(184,181,171,0.5)','rgba(184,181,171,0.5)','rgba(184,181,171,0.5)','rgba(184,181,171,0.5)','rgba(184,181,171,0.5)'],borderColor:['#B8B5AB','#ef9f27','#B8B5AB','#B8B5AB','#B8B5AB','#B8B5AB','#B8B5AB'],borderWidth:1,borderRadius:3},
+        {label:'Returned',data:[17.9,0,1.15,0.95,0.19,0.68,0.45],backgroundColor:'rgba(109,191,138,0.55)',borderColor:'#6dbf8a',borderWidth:1,borderRadius:3}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'M EUR';}}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888880',font:{size:10},maxRotation:30,autoSkip:false}},
+        y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#888880',font:{size:10},callback:function(v){return v+'M';}}}
+      }
+    }
+  });
+});
+</script>
+</body>
+</html>
