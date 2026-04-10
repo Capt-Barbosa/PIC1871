@@ -51,6 +51,25 @@
   });
   document.addEventListener('scroll', hide, true);
 })();
+// ===== COMMITTEE TOGGLE =====
+function toggleCommittee(id) {
+  var detail = document.getElementById(id + '-detail');
+  var arrow  = document.getElementById(id + '-arrow');
+  if (!detail) return;
+  var isOpen = detail.style.display !== 'none';
+  // Close all
+  ['cnr','car','cf','csp'].forEach(function(c) {
+    var d = document.getElementById(c + '-detail');
+    var a = document.getElementById(c + '-arrow');
+    if (d) d.style.display = 'none';
+    if (a) a.style.transform = 'rotate(0deg)';
+  });
+  // Open clicked if it was closed
+  if (!isOpen) {
+    detail.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+  }
+}
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -239,11 +258,71 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 
 /* PROGRESS RING */
 .prog-ring{transform:rotate(-90deg);}
+
+/* ===== RESPONSIVE ===== */
+.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:10px;background:none;border:none;z-index:1001;flex-shrink:0;}
+.hamburger span{display:block;width:22px;height:2px;background:var(--white);border-radius:2px;transition:all .25s;}
+.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg);}
+.hamburger.open span:nth-child(2){opacity:0;}
+.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;}
+.sidebar-overlay.show{display:block;}
+
+@media(max-width:900px){
+  .shell{position:relative;}
+  .sidebar{
+    position:fixed;top:0;left:0;height:100%;width:250px;min-width:0;
+    transform:translateX(-100%);transition:transform .28s ease;
+    z-index:1000;box-shadow:4px 0 24px rgba(0,0,0,0.15);
+  }
+  .sidebar.open{transform:translateX(0);}
+  .main{width:100%;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+  .topbar{padding:0 14px;}
+  .hamburger{display:flex;}
+  .topbar-right .tbadge:not(.live){display:none;}
+  .content{padding:14px;}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:9px;}
+  .kpi-grid-3{grid-template-columns:1fr 1fr;}
+  .kpi-grid-5{grid-template-columns:1fr 1fr;}
+  .alloc-cards{grid-template-columns:1fr 1fr;}
+  .row2,.row3,.row32,.row13{grid-template-columns:1fr;gap:11px;}
+  .fhdr{display:none;}
+  .frow{grid-template-columns:2fr 0.6fr 0.8fr 0.8fr;gap:6px;}
+  .frow>div:nth-child(2),.frow>div:nth-child(5){display:none;}
+  .alist-hdr,.alist-row{grid-template-columns:30px 1.8fr 0.8fr 0.9fr 0.9fr;gap:6px;padding-left:8px;}
+  .alist-row>div:nth-child(6),.alist-row>div:nth-child(7){display:none;}
+  .inv-stats{grid-template-columns:1fr 1fr;}
+}
+
+@media(max-width:520px){
+  .content{padding:10px;}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px;}
+  .kpi-value{font-size:18px;}
+  .kpi-sub{font-size:10px;}
+  .alloc-cards{grid-template-columns:1fr;}
+  .card{padding:12px 12px;}
+  .topbar{height:48px;}
+  .page-title{font-size:13px;}
+  .pills{gap:5px;flex-wrap:wrap;}
+  .pill{font-size:10px;padding:3px 8px;}
+  .scroll-t{max-height:240px;}
+  .frow{grid-template-columns:2fr 0.8fr 0.8fr;gap:5px;}
+  .frow>div:nth-child(3){display:none;}
+  .alist-hdr,.alist-row{grid-template-columns:28px 1.6fr 0.8fr;gap:5px;padding-left:6px;}
+  .alist-row>div:nth-child(4),.alist-row>div:nth-child(5),.alist-row>div:nth-child(6),.alist-row>div:nth-child(7){display:none;}
+  .inv-stats{grid-template-columns:1fr;}
+  .board-row{gap:5px;}
+  .row2,.row3,.row32,.row13{gap:8px;}
+  .chart-wrap{height:170px !important;}
+  .kpi-grid-3,.kpi-grid-5{grid-template-columns:1fr 1fr;}
+  select{font-size:11px;}
+}
 </style>
 </head>
 <body>
 <div class="shell">
-  <div class="sidebar">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div class="sidebar" id="sidebar">
     <div class="logo-area">
       <div class="logo-mark"><span>PIC</span> 1871</div>
       <div class="logo-sub">Philippson Investment Co.</div>
@@ -275,6 +354,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 
   <div class="main">
     <div class="topbar">
+      <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
       <div class="page-title" id="ptitle">Overview &mdash; PIC 1871</div>
       <div class="topbar-right">
         <span class="tbadge live">Live</span>
@@ -334,7 +414,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
       <div class="card-title">
         Objectifs &amp; ambitions &mdash; trajectory to 2049
         <div class="tip"><div class="tip-icon">?</div><div class="tip-box">
-          J-curve projection at 5%/yr. Floor = 750M (3&times; 2024 patrimony). Ambition = 1,500M (2&times; floor). Source: slide 55.
+          J-curve projection at 5%/yr. Floor = 750M (3&times; 2024 patrimony). Ambition = 1,500M (2&times; floor).
         </div></div>
       </div>
       <div class="chart-wrap" style="height:215px;"><canvas id="cGrowth" role="img" aria-label="25-year growth trajectory">Growth trajectory 2024-2049</canvas></div>
@@ -557,38 +637,38 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 
   <!-- INTRO BANNER -->
   <div style="padding:11px 15px;background:rgba(239,159,39,0.08);border:1px solid rgba(239,159,39,0.25);border-radius:7px;margin-bottom:16px;font-size:12px;color:var(--white2);line-height:1.5;">
-    <strong style="color:var(--amber);">Data source:</strong> All figures on this page come from the Nov 2024 family meeting presentation (slides 157&ndash;163). The investment process, KPIs and portfolio events are sourced verbatim. No estimates.
+    <strong style="color:var(--amber);">Data source:</strong> All figures on this page are from the Nov 2024 family meeting presentation. No estimates.
   </div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
     <div class="kpi">
-      <div class="kpi-label">Opportunities received <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 162: "44 opportunit&eacute;s d&apos;investissements depuis juin 2024"</div></div></div>
+      <div class="kpi-label">Opportunities received <div class="tip"><div class="tip-icon">?</div><div class="tip-box">"44 opportunit&eacute;s d&apos;investissements depuis juin 2024"</div></div></div>
       <div class="kpi-value">44</div>
-      <div class="kpi-sub">Since June 2024 &mdash; slide 162</div>
+      <div class="kpi-sub">Since June 2024</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Qualified for IC <div class="tip"><div class="tip-icon">?</div><div class="tip-box">IC = Comit&eacute; d&apos;investissement. From slide 162: "dont 3 ont &eacute;t&eacute; qualifi&eacute;es pour d&eacute;lib&eacute;ration au comit&eacute; d&apos;investissement". Sessions: 02/10/2024 &amp; 07/11/2024.</div></div></div>
+      <div class="kpi-label">Qualified for IC <div class="tip"><div class="tip-icon">?</div><div class="tip-box">IC = Comit&eacute; d&apos;investissement. "dont 3 ont &eacute;t&eacute; qualifi&eacute;es pour d&eacute;lib&eacute;ration au comit&eacute; d&apos;investissement". Sessions: 02/10/2024 &amp; 07/11/2024.</div></div></div>
       <div class="kpi-value">3</div>
       <div class="kpi-sub">IC sessions: 02/10 &amp; 07/11/2024</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Target pace <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 158: "2 nouveaux investissements / an"</div></div></div>
+      <div class="kpi-label">Target pace <div class="tip"><div class="tip-icon">?</div><div class="tip-box">"2 nouveaux investissements / an"</div></div></div>
       <div class="kpi-value">2 / year</div>
-      <div class="kpi-sub">New investments &mdash; slide 158</div>
+      <div class="kpi-sub">New investments per year</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Min EBITDA <div class="tip"><div class="tip-icon">?</div><div class="tip-box">From slide 158: "Soci&eacute;t&eacute;s rentables (&gt;&euro;2M EBITDA)". EBITDA = annual operating profit before interest &amp; tax.</div></div></div>
+      <div class="kpi-label">Min EBITDA <div class="tip"><div class="tip-icon">?</div><div class="tip-box">"Soci&eacute;t&eacute;s rentables (&gt;&euro;2M EBITDA)". EBITDA = annual operating profit before interest &amp; tax.</div></div></div>
       <div class="kpi-value">&gt;2 M&euro;</div>
-      <div class="kpi-sub">Profitable SMEs only &mdash; slide 158</div>
+      <div class="kpi-sub">Profitable SMEs only</div>
     </div>
   </div>
 
   <div class="row2">
 
-    <!-- INVESTMENT PROCESS (exact from slide 162) -->
+    <!-- INVESTMENT PROCESS (exact from ) -->
     <div class="card">
-      <div class="card-title">Process d&rsquo;investissement &mdash; slide 162</div>
+      <div class="card-title">Process d&rsquo;investissement </div>
       <div style="display:flex;flex-direction:column;gap:5px;margin-top:2px;">
         <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
           <div style="height:30px;background:rgba(184,181,171,0.08);border:1px solid rgba(184,181,171,0.2);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--white2);font-weight:600;width:100%;">Sourcing</div>
@@ -618,12 +698,12 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
           <div style="height:30px;background:var(--bg3);border-radius:4px;display:flex;align-items:center;padding:0 12px;color:var(--stone-dim);font-size:11px;width:18%;">CA &rarr; Investissement</div>
         </div>
       </div>
-      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 162 &mdash; "Aperçu du pipeline Q3-mi Q4 2024 – liste non-exhaustive"</div>
+      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);"></div>
     </div>
 
-    <!-- INVESTMENT STRATEGY (exact from slide 158) -->
+    <!-- INVESTMENT STRATEGY (exact from ) -->
     <div class="card">
-      <div class="card-title">Strat&eacute;gie d&rsquo;investissement &mdash; slide 158</div>
+      <div class="card-title">Strat&eacute;gie d&rsquo;investissement </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
         <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;align-items:flex-start;">
           <span style="color:var(--coral);font-weight:700;flex-shrink:0;">01</span>
@@ -650,13 +730,13 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
           <div><div style="font-size:12px;font-weight:600;color:var(--white2);">Europe occidentale</div></div>
         </div>
       </div>
-      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 158</div>
+      <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);"></div>
     </div>
   </div>
 
   <!-- H2 2024 EVENTS (exact from slides 159-160) -->
   <div class="card" style="margin-bottom:14px;">
-    <div class="card-title">Faits marquants &mdash; 2&egrave;me semestre 2024 &mdash; slides 159&ndash;160</div>
+    <div class="card-title">Faits marquants &mdash; 2&egrave;me semestre 2024 &mdash; </div>
     <div style="display:flex;flex-direction:column;gap:0;">
 
       <!-- Guardiola Capital incorporation -->
@@ -723,12 +803,12 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
         <div style="flex-shrink:0;"><span class="tag tag-green">Active</span></div>
       </div>
     </div>
-    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slides 159&ndash;160 &mdash; "Faits marquants du deuxi&egrave;me semestre 2024"</div>
+    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);"></div>
   </div>
 
   <!-- TEAM -->
   <div class="card">
-    <div class="card-title">Equipe op&eacute;rationnelle &mdash; slide 158</div>
+    <div class="card-title">Equipe op&eacute;rationnelle </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div style="padding:12px;background:var(--bg3);border-radius:7px;">
         <div style="font-size:13px;font-weight:700;color:var(--white);">Fr&eacute;d&eacute;ric Markiewicz</div>
@@ -745,7 +825,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
         </div>
       </div>
     </div>
-    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);">Source: slide 158 &mdash; "Mise en place de Guardiola Capital"</div>
+    <div style="margin-top:10px;font-size:10px;color:var(--stone-dim);"></div>
   </div>
 
 </div>
@@ -755,7 +835,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 
   <!-- INTRO BANNER -->
   <div style="padding:11px 15px;background:rgba(184,181,171,0.07);border:1px solid rgba(184,181,171,0.2);border-radius:7px;margin-bottom:16px;font-size:12px;color:var(--white2);line-height:1.5;">
-    <strong style="color:var(--stone);">Philing &mdash; Opportunit&eacute;s:</strong> Legacy holdings, real estate developments and ad-hoc investments. Managed by Marc Van Doornick &amp; Jacques-Martin Philippson. Classification from slide 28 (Nov 2025).
+    <strong style="color:var(--stone);">Philing &mdash; Opportunit&eacute;s:</strong> Legacy holdings, real estate developments and ad-hoc investments. Managed by Marc Van Doornick &amp; Jacques-Martin Philippson. Classification from ).
     <span style="color:var(--stone-dim);">Direct investments (Guardiola Capital) are on the <strong style="color:var(--white2);">Guardiola Capital</strong> page.</span>
   </div>
 
@@ -798,7 +878,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 
   <!-- À CONSERVER -->
   <div class="card" style="margin-bottom:14px;">
-    <div class="card-title" style="color:var(--green);">&agrave; conserver <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; investments to keep long-term &mdash; slide 28</span></div>
+    <div class="card-title" style="color:var(--green);">&agrave; conserver <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; investments to keep long-term &mdash; </span></div>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;">
       <div style="padding:9px 11px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;">
         <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Cetim Projets</div>
@@ -843,12 +923,12 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
       <span class="tag tag-green">Cetim Holding</span>
       <span class="tag tag-green">Cetim Student RE</span>
     </div>
-    <div style="margin-top:8px;font-size:10px;color:var(--stone-dim);">Source: slide 28, Nov 2025 &mdash; column "Opportunit&eacute;s (Philing)" &mdash; section "&Agrave; conserver"</div>
+    <div style="margin-top:8px;font-size:10px;color:var(--stone-dim);"></div>
   </div>
 
   <!-- À CÉDER -->
   <div class="card">
-    <div class="card-title" style="color:var(--amber);">&agrave; c&eacute;der ou conserver jusqu&rsquo;&agrave; extinction <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; slide 28</span></div>
+    <div class="card-title" style="color:var(--amber);">&agrave; c&eacute;der ou conserver jusqu&rsquo;&agrave; extinction <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">&mdash; </span></div>
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px;">
       <div style="padding:9px 11px;background:rgba(239,159,39,0.06);border:1px solid rgba(239,159,39,0.2);border-radius:6px;">
         <div style="font-size:10px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">AED Rent</div>
@@ -874,7 +954,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
       <span class="tag tag-amber">LuckyCycle</span>
       <span class="tag tag-amber">Domaine des Fouquettes</span>
     </div>
-    <div style="font-size:10px;color:var(--stone-dim);">Source: slide 28, Nov 2025 &mdash; column "Opportunit&eacute;s (Philing)" &mdash; section "&Agrave; c&eacute;der ou conserver jusqu&rsquo;&agrave; extinction"</div>
+    <div style="font-size:10px;color:var(--stone-dim);"></div>
   </div>
 
 </div>
@@ -1062,7 +1142,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
 <div class="page" id="p-governance">
 
   <div class="card" style="margin-bottom:14px;">
-    <div class="card-title">Conseil d&rsquo;administration &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">source: pic1871.ch &amp; slide 20, Nov 2025</span></div>
+    <div class="card-title">Conseil d&rsquo;administration</div>
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">
       <div style="padding:13px;background:var(--bg3);border-radius:7px;border-left:3px solid var(--coral);">
         <div style="font-size:10px;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Chairman of the Board</div>
@@ -1111,12 +1191,12 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
         <div style="font-size:13px;font-weight:700;color:var(--white);">Charles Spierer</div>
       </div>
     </div>
-    <div style="font-size:10px;color:var(--stone-dim);">Rule (slide 20): Min 3 family administrators (1 per branch) + at least as many external administrators. Committees: CNR &amp; CAR.</div>
+    
   </div>
 
   <div class="row2">
     <div class="card">
-      <div class="card-title">Equipe op&eacute;rationnelle &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">pic1871.ch</span></div>
+      <div class="card-title">Equipe op&eacute;rationnelle</div>
       <div style="display:flex;flex-direction:column;gap:7px;">
         <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(240,90,64,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--coral);flex-shrink:0;">ER</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Est&eacute;e Roguet</div><div style="font-size:10px;color:var(--stone-dim);">Secr&eacute;taire G&eacute;n&eacute;rale</div></div></div>
         <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border-radius:6px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(184,181,171,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--stone);flex-shrink:0;">MB</div><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Mich&egrave;le Benichou</div><div style="font-size:10px;color:var(--stone-dim);">Executive Assistant</div></div></div>
@@ -1127,20 +1207,110 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Comit&eacute;s <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Advisory committees informing the Board. No independent decision-making power.</div></div></div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="padding:11px 13px;background:rgba(240,90,64,0.06);border:1px solid rgba(240,90,64,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--coral);margin-bottom:4px;">CNR &mdash; Nomination et R&eacute;mun&eacute;ration (6)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Advises on board nominations, family onboarding, remuneration and required competencies.</div></div>
-        <div style="padding:11px 13px;background:rgba(91,163,217,0.06);border:1px solid rgba(91,163,217,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;">CAR &mdash; Audit et Risques (7)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Reviews accounts, risk and internal controls. Advises on the annual Juste Valeur consolidation.</div></div>
-        <div style="padding:11px 13px;background:rgba(109,191,138,0.06);border:1px solid rgba(109,191,138,0.2);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;">Comit&eacute; Familial (2)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">1 member per branch + 2 external board members. Organises family meetings and training.</div></div>
-        <div style="padding:11px 13px;background:rgba(184,181,171,0.06);border:1px solid rgba(184,181,171,0.15);border-radius:6px;"><div style="font-size:11px;font-weight:700;color:var(--stone);margin-bottom:4px;">Comit&eacute; Supervision Philanthropie (11)</div><div style="font-size:11px;color:var(--white2);line-height:1.5;">Oversees Alma philanthropic activity. Meets quarterly.</div></div>
+      <div class="card-title">Comit&eacute;s <div class="tip"><div class="tip-icon">?</div><div class="tip-box">Advisory committees informing the Board. Click any committee to see its members.</div></div></div>
+      <div style="font-size:11px;color:var(--stone-dim);margin-bottom:10px;">Click a committee to expand members &darr;</div>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="committeeList">
+
+        <!-- CNR -->
+        <div style="border:1px solid rgba(224,74,47,0.25);border-radius:7px;overflow:hidden;">
+          <div style="padding:11px 13px;background:rgba(224,74,47,0.05);">
+            <div style="font-size:12px;font-weight:700;color:var(--coral);">CNR &mdash; Nomination &amp; R&eacute;mun&eacute;ration</div>
+            <div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Advises on nominations, onboarding, remuneration &amp; competencies</div>
+          </div>
+        </div>
+
+        <!-- CAR -->
+        <div style="border:1px solid rgba(45,122,181,0.25);border-radius:7px;overflow:hidden;">
+          <div style="padding:11px 13px;background:rgba(45,122,181,0.05);">
+            <div style="font-size:12px;font-weight:700;color:var(--blue);">CAR &mdash; Audit &amp; Risques</div>
+            <div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Reviews accounts, risk, controls. Advises on annual Juste Valeur.</div>
+          </div>
+        </div>
+
+        <!-- Comité Familial -->
+        <div style="border:1px solid rgba(46,143,90,0.25);border-radius:7px;overflow:hidden;cursor:pointer;" onclick="toggleCommittee('cf')">
+          <div style="padding:11px 13px;background:rgba(46,143,90,0.05);display:flex;justify-content:space-between;align-items:center;">
+            <div><div style="font-size:12px;font-weight:700;color:var(--green);">Comit&eacute; Familial</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Organises family meetings, manages information flow &amp; training</div></div>
+            <span id="cf-arrow" style="font-size:14px;color:var(--green);">&#8250;</span>
+          </div>
+          <div id="cf-detail" style="display:none;padding:12px 13px;border-top:1px solid rgba(46,143,90,0.15);background:#fff;">
+            <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Composition</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,143,90,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);flex-shrink:0;">VD</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Vincent Doumier</div><div style="font-size:10px;color:var(--stone-dim);">Pr&eacute;sident &mdash; administrateur ind&eacute;pendant non familial</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,143,90,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);flex-shrink:0;">FP</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Fran&ccedil;oise Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Membre familial &mdash; Branche F</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,143,90,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);flex-shrink:0;">CP</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Catherine Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Membre familial &mdash; Branche C</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,143,90,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);flex-shrink:0;">JM</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Jacques-Martin Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Membre familial &mdash; Branche JM</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,143,90,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);flex-shrink:0;">&#43;</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">1 administrateur ind&eacute;pendant</div><div style="font-size:10px;color:var(--stone-dim);">Administrateur externe d&rsquo;Akassia / PIC 1871 (dont le Pr&eacute;sident)</div></div>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+
+        <!-- Comité Supervision Philanthropie -->
+        <div style="border:1px solid rgba(107,104,96,0.2);border-radius:7px;overflow:hidden;cursor:pointer;" onclick="toggleCommittee('csp')">
+          <div style="padding:11px 13px;background:rgba(107,104,96,0.04);display:flex;justify-content:space-between;align-items:center;">
+            <div><div style="font-size:12px;font-weight:700;color:var(--stone);">Comit&eacute; Supervision Philanthropie</div><div style="font-size:11px;color:var(--stone-dim);margin-top:2px;">Decision power for philanthropy. Meets 4x/year.</div></div>
+            <span id="csp-arrow" style="font-size:14px;color:var(--stone);">&#8250;</span>
+          </div>
+          <div id="csp-detail" style="display:none;padding:12px 13px;border-top:1px solid rgba(107,104,96,0.12);background:#fff;">
+            <div style="font-size:10px;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Members</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">AP</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Alain Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Pr&eacute;sident &mdash; dur&eacute;e ind&eacute;termin&eacute;e</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">L</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Laure</div><div style="font-size:10px;color:var(--stone-dim);">Repr&eacute;sentante branche F</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">CP</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Catherine Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Repr&eacute;sentante branche C</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">JM</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Jacques-Martin Philippson</div><div style="font-size:10px;color:var(--stone-dim);">Repr&eacute;sentant branche JM</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">CS</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Charles Spierer</div><div style="font-size:10px;color:var(--stone-dim);">Administrateur externe</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;background:#faf9f7;border-radius:5px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(107,104,96,0.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--stone);flex-shrink:0;">MV</div>
+                <div><div style="font-size:12px;font-weight:600;color:#2d2d2d;">Marc Van Doornick</div><div style="font-size:10px;color:var(--stone-dim);">Administrateur ex&eacute;cutif &mdash; administration &amp; suivi</div></div>
+              </div>
+              <div style="margin-top:4px;padding:7px 10px;background:rgba(107,104,96,0.05);border-radius:5px;">
+                <div style="font-size:10px;font-weight:600;color:var(--stone-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Observateurs</div>
+                <div style="font-size:11px;color:#555;">Fran&ccedil;oise, Juliette, Jules (1 par branche familiale)</div>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+
       </div>
-      <div style="margin-top:8px;font-size:10px;color:var(--stone-dim);">Numbers in brackets = org chart node numbers, slide 22.</div>
+      
     </div>
   </div>
 
   <div class="row2">
     <div class="card">
-      <div class="card-title">Charte familiale &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slide 17, Nov 2025</span></div>
+      <div class="card-title">Charte familiale</div>
       <div style="font-size:12px;color:var(--stone-dim);margin-bottom:10px;font-style:italic;">"Points cardinaux d&rsquo;Alain : La Famille &mdash; L&rsquo;Entreprise &mdash; La Philanthropie"</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div style="display:flex;gap:9px;padding:9px 11px;background:var(--bg3);border-radius:5px;"><span style="color:var(--coral);font-weight:700;flex-shrink:0;">&bull;</span><div><div style="font-size:12px;font-weight:600;color:var(--white2);">Coh&eacute;sion familiale</div><div style="font-size:11px;color:var(--stone-dim);">Transmission du patrimoine (PIC et Alma) et des connaissances, solidarit&eacute; familiale</div></div></div>
@@ -1151,7 +1321,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Distribution &amp; valorisation &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slide 84</span></div>
+      <div class="card-title">Distribution &amp; valorisation</div>
       <div style="padding:12px 14px;background:rgba(240,90,64,0.07);border:1px solid rgba(240,90,64,0.2);border-radius:6px;margin-bottom:10px;">
         <div style="font-size:11px;font-weight:700;color:var(--coral);margin-bottom:6px;">Politique de distribution</div>
         <div style="font-size:12px;color:var(--white2);line-height:1.6;"><strong style="color:var(--white);">Aucune distribution avant 2031</strong>, sauf d&eacute;cision unanime des associ&eacute;s.<br>Apr&egrave;s 2031&nbsp;: li&eacute;e &agrave; la <strong style="color:var(--white);">r&eacute;alisation du plan strat&eacute;gique</strong> et &agrave; la Juste Valeur annuelle.</div>
@@ -1169,7 +1339,7 @@ input[type=text]{font-size:12px;padding:6px 10px;border:1px solid var(--border2)
   </div>
 
   <div class="card">
-    <div class="card-title">Onboarding next gen &mdash; <span style="color:var(--stone-dim);font-weight:400;text-transform:none;letter-spacing:0;">slides 30&ndash;31, Nov 2025</span></div>
+    <div class="card-title">Onboarding next gen</div>
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">
       <div style="padding:11px 13px;background:var(--bg3);border-radius:6px;border-top:2px solid var(--coral);"><div style="font-size:10px;font-weight:600;color:var(--coral);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Loyaut&eacute; &amp; formation</div><div style="font-size:12px;font-weight:600;color:var(--white2);margin-bottom:4px;">Obligation de loyaut&eacute;</div><div style="font-size:11px;color:var(--stone-dim);">Confidentialit&eacute;, investissement du temps, formation requise. Pr&eacute;vu Art. 12-D convention.</div></div>
       <div style="padding:11px 13px;background:var(--bg3);border-radius:6px;border-top:2px solid var(--blue);"><div style="font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Formation (Art. 7 Charte)</div><div style="font-size:12px;font-weight:600;color:var(--white2);margin-bottom:4px;">3 domaines</div><div style="font-size:11px;color:var(--stone-dim);">Gouvernance familiale &middot; Organisation &amp; activit&eacute;s &middot; Diversification des investissements</div></div>
@@ -1202,9 +1372,8 @@ function fcad(n){if(!n||n===0)return'\u2014';var e=n*CAD;var es=e>=1000000?(e/10
 function fusd(n){if(!n||n===0)return'\u2014';var e=n*USD;var es=e>=1000000?(e/1000000).toFixed(1)+'M\u20ac':(e/1000).toFixed(0)+'K\u20ac';return '$'+(n/1000).toFixed(0)+'K USD<br><span style="font-size:10px;color:#ef9f27;">\u2248'+es+'</span>';}
 function famt(n,ccy){if(ccy==='CAD')return fcad(n);if(ccy==='USD')return fusd(n);return fe(n);}
 
-// FUND DATA — source: Annex 31/10/2025 + slide 28 Nov 2025
+// FUND DATA
 var FUNDS=[
-  // --- INDIRECT (LP) ---
   {id:'f1',  n:'Appalaches I',          type:'Indirect', ccy:'EUR', commit:1852830,  called:1852830,  ret:3198309, irr:'~20%', sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'First Appalaches fund. Canadian traditional sector buyout. Fully called. 3.2M returned on 1.85M committed. 25-year track record.', hurdle:'8%', carry:'Min 10%'},
   {id:'f2',  n:'Appalaches II',         type:'Indirect', ccy:'EUR', commit:3088050,  called:2343175,  ret:3197342, irr:'~20%', sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'Second Appalaches fund. 3.2M returned already. CAD 744K still to be called.', hurdle:'8%', carry:'Min 10%'},
   {id:'f3',  n:'Appalaches III',        type:'Indirect', ccy:'EUR', commit:18528300, called:2302960,  ret:0,       irr:'15%',  sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG / Christian Turgeon', desc:'Third fund, ~400M CAD total. Closing Dec 2024. Only 2.3M called — early deployment. Largest single commitment.', hurdle:'8%', carry:'Min 10%'},
@@ -1214,7 +1383,7 @@ var FUNDS=[
   {id:'f7',  n:'SpringHill Access I',   type:'Indirect', ccy:'EUR', commit:862540,   called:207010,   ret:0,       irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'SpringHill',              desc:'Fund of funds. 207K called so far.', hurdle:'8%', carry:'10%'},
   {id:'f8',  n:'Sweetwood I',           type:'Indirect', ccy:'EUR', commit:862540,   called:760624,   ret:307039,  irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'Sweetwood Capital',       desc:'Fund of funds. 307K returned to date.', hurdle:'8%', carry:'10%'},
   {id:'f9',  n:'Sweetwood II',          type:'Indirect', ccy:'EUR', commit:862540,   called:546491,   ret:20460,   irr:'TBD',  sector:'Fund of Funds',   country:'Europe',     impact:false, manager:'Sweetwood Capital',       desc:'Fund of funds. 20K returned. Still deploying.', hurdle:'8%', carry:'10%'},
-  {id:'f10', n:'LAF NYC',               type:'Indirect', ccy:'EUR', commit:731995,   called:731995,   ret:390363,  irr:'TBD',  sector:'Real Estate',     country:'USA',        impact:false, manager:'LAF NYC',                 desc:'NYC real estate LP. 390K returned on 732K. Source: Annex + slide 28 (Indirect column).', hurdle:'8%', carry:'TBD'},
+  {id:'f10', n:'LAF NYC',               type:'Indirect', ccy:'EUR', commit:731995,   called:731995,   ret:390363,  irr:'TBD',  sector:'Real Estate',     country:'USA',        impact:false, manager:'LAF NYC',                 desc:'NYC real estate LP. 390K returned on 732K. Source: Annex + ).', hurdle:'8%', carry:'TBD'},
   {id:'f11', n:'Belgian Land',          type:'Indirect', ccy:'EUR', commit:340000,   called:290000,   ret:89359,   irr:'TBD',  sector:'Real Estate',     country:'Belgium',    impact:false, manager:'Belgian Land',            desc:'Belgian real estate fund. 89K returned. 50K still to be called.', hurdle:'8%', carry:'TBD'},
   {id:'f12', n:'Altoria Fund',          type:'Indirect', ccy:'EUR', commit:1544025,  called:1544025,  ret:0,       irr:'TBD',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Altoria (formalising GP)', desc:'Currently classified as Indirect LP. Slide 28 (Nov 2025) lists it under Associes as "a formaliser" — GP stake in progress.', hurdle:'TBD', carry:'TBD'},
   {id:'f13', n:'Impact Expansion Fund', type:'Indirect', ccy:'EUR', commit:2500000,  called:1613381,  ret:0,       irr:'~8%',  sector:'Impact PE',       country:'Europe',     impact:true,  manager:'TBD',                     desc:'Impact-focused PE fund. 1.6M called, no distributions yet — early phase.', hurdle:'8%', carry:'TBD'},
@@ -1232,7 +1401,7 @@ var FUNDS=[
   {id:'g1',  n:'BDG & Associes',        type:'Associes', ccy:'EUR', commit:1649203,  called:1649203,  ret:0,       irr:'25%',  sector:'Buyout',          country:'Canada',     impact:false, manager:'BDG',                     desc:'24.5% stake in BDG — the GP managing Appalaches I/II/III. Earns carried interest (min 10%) on all 3 funds. 1 board seat on 5-member board. Christian Turgeon CEO.', hurdle:'8%', carry:'Min 10%'},
   {id:'g2',  n:'La Maison Partners',    type:'Associes', ccy:'EUR', commit:4701027,  called:4701027,  ret:0,       irr:'25%',  sector:'Tech',            country:'Israel/Asia',impact:false, manager:'La Maison Partners',      desc:'24% stake in La Maison Partners GP. ~500M EUR AUM. Tech/co-investments, Israel and Asia. 2 governance seats. Min 17.5% carried interest. Founded by Michel Cicurel & Marc Levy.', hurdle:'8%', carry:'Min 17.5%'},
   {id:'g3',  n:'Seido (Theodorus GP)',  type:'Associes', ccy:'EUR', commit:432327,   called:185283,   ret:0,       irr:'25%',  sector:'Health / Biotech', country:'Canada',    impact:false, manager:'Seido Inc',               desc:'25% stake in Seido — GP managing Theodorus health VC funds. Biotech, MedTech, digital health. 1 board seat. CAD 247K still to be called.', hurdle:'8%', carry:'Min 15%'},
-  {id:'g4',  n:'Altoria (a formaliser)',type:'Associes', ccy:'EUR', commit:0,        called:0,        ret:0,       irr:'25%',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Altoria',                 desc:'GP stake to be formalised — listed on slide 28 (Nov 2025) in Associes column. Currently 1.54M invested as LP (Indirect). Transition to GP co-ownership in progress.', hurdle:'TBD', carry:'TBD'},
+  {id:'g4',  n:'Altoria (a formaliser)',type:'Associes', ccy:'EUR', commit:0,        called:0,        ret:0,       irr:'25%',  sector:'Private Equity',  country:'Europe',     impact:false, manager:'Altoria',                 desc:'GP stake to be formalised — listed on ) in Associes column. Currently 1.54M invested as LP (Indirect). Transition to GP co-ownership in progress.', hurdle:'TBD', carry:'TBD'},
 ];
 
 // Active filters state
@@ -1661,6 +1830,30 @@ window.addEventListener('DOMContentLoaded',function(){
     }
   });
 });
+// ===== SIDEBAR RESPONSIVE =====
+function toggleSidebar(){
+  var sb=document.getElementById('sidebar');
+  var hb=document.getElementById('hamburger');
+  var ov=document.getElementById('sidebarOverlay');
+  var open=sb.classList.toggle('open');
+  hb.classList.toggle('open',open);
+  ov.classList.toggle('show',open);
+}
+function closeSidebar(){
+  var sb=document.getElementById('sidebar');
+  var hb=document.getElementById('hamburger');
+  var ov=document.getElementById('sidebarOverlay');
+  if(sb)sb.classList.remove('open');
+  if(hb)hb.classList.remove('open');
+  if(ov)ov.classList.remove('show');
+}
+// Auto-close on nav click on small screens
+document.querySelectorAll('.nav-item').forEach(function(el){
+  el.addEventListener('click',function(){
+    if(window.innerWidth<=900)closeSidebar();
+  });
+});
+
 </script>
 </body>
 </html>
